@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Northstar AI — Solution Lab for Small Businesses</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='enhancements.css') }}">
 </head>
 <body>
   <header class="topbar">
@@ -16,9 +17,12 @@
       <div class="side-eyebrow">YOUR WORKSPACE</div>
       <nav class="side-nav">
         <button class="nav-item active" data-pane="profile"><span>01</span> Business profile</button>
+        <button class="nav-item" data-pane="readiness"><span>★</span> Readiness + current tools</button>
         <button class="nav-item" data-pane="results"><span>02</span> AI recommendations</button>
         <button class="nav-item" data-pane="diagnosis"><span>03</span> Business health check</button>
         <button class="nav-item" data-pane="lab"><span>04</span> Solution lab</button>
+        <button class="nav-item" data-pane="architecture"><span>↳</span> Before / after workflow</button>
+        <button class="nav-item" data-pane="passport"><span>★</span> Decision Passport</button>
         <button class="nav-item" data-pane="adoption"><span>05</span> Adoption roadmap</button>
         <button class="nav-item" data-pane="discovery"><span>06</span> Discover new tools</button>
       </nav>
@@ -40,6 +44,12 @@
             <label>Software already used <select name="software" id="software"><option>Square</option><option>Shopify</option><option>QuickBooks</option><option>Google Sheets</option><option>Wix</option><option>None</option></select></label>
             <label>Technical comfort <select name="comfort" id="comfort"><option value="beginner">Beginner — keep it simple</option><option value="intermediate">Comfortable with apps</option><option value="advanced">Advanced — I can configure tools</option></select></label>
           </div>
+          <div class="form-grid extra-questions">
+            <label>Do you have relevant business data?
+              <select name="data_available"><option value="unsure">Not sure yet</option><option value="yes">Yes, I can export records</option><option value="some">Some, but they're incomplete</option><option value="no">Not yet</option></select></label>
+            <label>Do customers opt in to marketing messages?
+              <select name="consent"><option value="unsure">I need to check</option><option value="yes">Yes, documented opt-ins</option><option value="no">No / not applicable</option></select></label>
+          </div>
           <label>Describe your biggest challenge in your own words <textarea id="challengeText" name="challengeText" rows="3" placeholder="Example: Our regulars have stopped visiting and I don't know why...">My customers aren't returning as often, and I want to bring them back without spending much on advertising.</textarea></label>
           <div class="form-actions"><p>You'll get a transparent match score, suggested tools, and an adoption plan.</p><button class="primary-btn" type="submit" id="match-btn">Find my AI solutions <span>→</span></button></div>
         </form>
@@ -49,6 +59,18 @@
         <div class="section-top"><div><div class="eyebrow">STEP 02 · COMPARE</div><h2 id="title-results">Your AI recommendations</h2><p>Matches based on your business challenge, setup effort and current tools.</p></div><span class="section-icon">✧</span></div>
         <div class="disclaimer">ℹ Demo fit scores are calculated by a transparent rule-based formula. Pricing and integrations must be confirmed on vendors' official pages.</div>
         <div id="results-content" class="empty-state">Complete your business profile to see personalized recommendations.</div>
+        <div id="review-evidence" class="panel"><h3>Community evidence from similar businesses</h3><p>Review independent customer experiences on their original websites. Northstar never invents user testimonials.</p><div id="review-content">Choose a recommended tool to find relevant external reviews.</div>
+        <details><summary>Share your own experience for moderation</summary>
+          <form id="review-form" class="review-form">
+            <label>Tool <select name="tool_id" id="review-tool" required></select></label>
+            <label>Industry <input name="industry" maxlength="80" placeholder="Coffee shop" required></label>
+            <label>Team size <select name="company_size"><option>1–10</option><option>11–50</option><option>51+</option></select></label>
+            <label>Use case <input name="use_case" maxlength="100" placeholder="Customer email campaigns" required></label>
+            <label>Rating <select name="rating"><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label>
+            <label>What actually happened? <textarea name="comment" minlength="30" maxlength="1500" required></textarea></label>
+            <label>Optional public evidence link <input type="url" name="evidence_url" maxlength="350" placeholder="https://..."></label>
+            <button class="primary-btn" type="submit">Submit for moderation</button><p class="fineprint" id="review-feedback" aria-live="polite">Reviews remain private pending approval. We never automatically publish submissions.</p>
+          </form></details></div>
       </section>
 
       <section class="pane" id="pane-diagnosis" aria-labelledby="title-diagnosis">
@@ -80,9 +102,34 @@
         </div>
       </section>
 
+
+      <section class="pane" id="pane-readiness" aria-labelledby="title-readiness">
+        <div class="section-top"><div><div class="eyebrow">STEP 02 · PREPARE</div><h2 id="title-readiness">Is your business ready for AI?</h2><p>See what you already have and what should be checked before adopting another tool.</p></div></div>
+        <div id="readiness-content" class="panel">Complete your profile to receive a readiness check.</div>
+        <div id="software-audit-content"></div>
+      </section>
+
+      <section class="pane" id="pane-architecture" aria-labelledby="title-architecture">
+        <div class="section-top"><div><div class="eyebrow">SEE THE BIG PICTURE</div><h2 id="title-architecture">Before vs. after your AI solution</h2><p>Click each stage to understand your possible workflow and what's actually connected.</p></div></div>
+        <div class="beforeafter">
+          <div class="panel"><h3>How things work today</h3><div id="workflow-before"></div></div>
+          <div class="panel"><h3>How they could work tomorrow</h3><div id="workflow-after"></div></div>
+        </div>
+        <div class="panel"><h3>Explore the proposed architecture</h3><div id="architecture-flow" class="architecture-flow"></div>
+          <div id="architecture-detail" class="architecture-detail" aria-live="polite">Select a step to learn more.</div>
+          <p class="fineprint">Proposed workflow only; no vendor accounts or live integrations are connected.</p>
+        </div>
+      </section>
+
+      <section class="pane" id="pane-passport" aria-labelledby="title-passport">
+        <div class="section-top"><div><div class="eyebrow">YOUR DECISION, DOCUMENTED</div><h2 id="title-passport">AI Decision Passport</h2><p>Every assumption, recommendation and next step in one easy-to-share summary.</p></div></div>
+        <div class="panel" id="passport-content">Complete your business profile to create your decision record.</div>
+        <div class="passport-actions"><button class="secondary-btn" id="passport-download" type="button">Download decision data</button><button class="primary-btn" id="passport-print" type="button">Print / Save PDF</button></div>
+      </section>
       <footer class="main-footer">Northstar AI · Student hackathon MVP · Synthetic demonstration data · Verify product information before business use.</footer>
     </section>
   </main>
   <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='enhancements.js') }}" defer></script>
 </body>
 </html>
