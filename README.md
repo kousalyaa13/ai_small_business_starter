@@ -1,3 +1,38 @@
+
+## Interactive Solution Workspace (new branch)
+
+This branch adds owner-friendly features to the original Flask app without changing the core technology stack.
+
+- **AI readiness assessment:** explains available data, customer consent, setup comfort, and blockers. Scores are illustrative, not validated AI audits.
+- **Existing software audit:** helps owners check whether Square, Shopify, QuickBooks, Google Sheets, or Wix already solves their issue.
+- **Tool comparison + review research:** recommendation cards still use explicitly provisional scores. A new review panel links to an external G2 search instead of inventing testimonials. Users may submit feedback, but new entries are stored as `Pending moderation` and are not automatically published.
+- **Before/after + clickable architecture:** seven business problems are supported, each with different workflow steps. The architecture is illustrative and no vendor accounts are connected.
+- **Cost estimation:** extends the original monthly cost calculator with setup costs, API/extra fees, cash-benefit assumptions and first-year value.
+- **Implementation tracking:** six checkable phases, with progress saved in the same browser's local storage. This is not real-time vendor deployment monitoring.
+- **AI Decision Passport:** reflects the selected scenario, readiness, existing-system advice, top suggested tool, tentative financial estimate, progress, and uncertainties. Export to JSON, or use browser Print / Save as PDF.
+- **Tool test drive and data check:** existing model-powered or template preview and synthetic-CSV analysis remain available.
+
+### Launch
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+Visit http://127.0.0.1:5000. The preview uses a labeled template unless `OPENAI_API_KEY` is configured on the server.
+
+### Tests
+
+```bash
+python -m unittest discover -s tests -v
+node --check static/app.js
+node --check static/enhancements.js
+```
+
+**Important:** Results are research prototypes, not proven vendor performance; official prices, APIs and integrations must be checked before making a purchase. No real customer emails are sent. Use synthetic data in a public hackathon demo. Review submissions are unverified and remain private until a future moderation workflow exists. SQLite review submissions need persistent storage in a production deployment.
+
 # Northstar AI — Small Business Solution Lab (starter)
 
 A runnable **student hackathon starter application**, intended for learning and extension. It has a responsive business onboarding flow, a rule-based tool matching engine, a synthetic-data CSV health check, a preview generator (template fallback or optional OpenAI API), ROI estimator, guided adoption steps, and a constrained official-page discovery feature.
