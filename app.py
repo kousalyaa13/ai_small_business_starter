@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, render_template, request
+from advisor import assess, audit, blueprint, reviews_for
 
 BASE = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE / "tools.db")))
@@ -53,6 +54,12 @@ def init_db():
     with db() as con:
         con.execute("CREATE TABLE IF NOT EXISTS tools (id TEXT PRIMARY KEY, name TEXT, payload TEXT NOT NULL)")
         con.execute("CREATE TABLE IF NOT EXISTS discovered (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, title TEXT, summary TEXT, evidence TEXT, created_at TEXT, status TEXT)")
+        con.execute("""CREATE TABLE IF NOT EXISTS review_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tool_id TEXT NOT NULL, industry TEXT, company_size TEXT,
+            use_case TEXT, rating INTEGER, comment TEXT,
+            evidence_url TEXT, created_at TEXT, status TEXT
+        )""")
         count = con.execute("SELECT COUNT(*) FROM tools").fetchone()[0]
         if not count:
             catalog = json.loads((BASE / "data" / "tools.json").read_text())
@@ -122,7 +129,7 @@ def stack_steps(problem):
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    return render_template("dashboard.html")
 
 
 @app.post("/api/recommend")
@@ -132,7 +139,12 @@ def recommend():
     tools = [score_tool(t, profile, problem) for t in get_tools()]
     tools.sort(key=lambda t: (t["score"], problem in t["problems"]), reverse=True)
     top = tools[:3]
+    for tool in top:
+        tool["review_evidence"] = reviews_for(tool)
     return jsonify({"problem": problem, "tools": top,
+                    "readiness": assess(profile, problem),
+                    "software_audit": audit(profile, problem),
+                    "blueprint": blueprint(profile, problem),
                     "steps": stack_steps(problem),
                     "solution": "Start with the best compatible tool and add a second only if a specific workflow needs it.",
                     "disclaimer": "Demo ratings and catalog data require human verification. No vendor account has been connected."})
@@ -245,6 +257,38 @@ def discover():
     except requests.RequestException:
         return jsonify({"error": "The site couldn't be reached. Some vendors block automated requests."}), 422
 
+
+@app.post("/api/reviews/submit")
+def submit_review():
+    """Store unverified feedback for moderation. Never publish automatically."""
+    payload = request.get_json(silent=True) or {}
+    tool_id = str(payload.get("tool_id", ""))
+    if tool_id not in {tool["id"] for tool in get_tools()}:
+        return jsonify({"error": "Choose a listed tool."}), 400
+    comment = str(payload.get("comment", "")).strip()
+    if not 30 <= len(comment) <= 1500:
+        return jsonify({"error": "Please describe your experience in 30 to 1500 characters."}), 400
+    try:
+        rating = int(payload.get("rating"))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Choose a rating from 1 to 5."}), 400
+    if rating not in range(1, 6):
+        return jsonify({"error": "Choose a rating from 1 to 5."}), 400
+    evidence_url = str(payload.get("evidence_url", "")).strip()
+    if evidence_url and (not evidence_url.startswith("https://") or len(evidence_url) > 350):
+        return jsonify({"error": "Evidence must be an HTTPS link."}), 400
+    with db() as con:
+        con.execute(
+            """INSERT INTO review_submissions
+               (tool_id,industry,company_size,use_case,rating,comment,evidence_url,created_at,status)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (tool_id, str(payload.get("industry", ""))[:80],
+             str(payload.get("company_size", ""))[:40],
+             str(payload.get("use_case", ""))[:100], rating,
+             comment, evidence_url, date.today().isoformat(), "Pending moderation")
+        )
+    return jsonify({"status": "Pending moderation",
+                    "message": "Your review was saved for moderation, not published."}), 201
 
 @app.get("/health")
 def health():

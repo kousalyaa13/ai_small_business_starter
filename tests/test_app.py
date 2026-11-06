@@ -10,6 +10,9 @@ class AppTests(unittest.TestCase):
         r = self.client.get('/')
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'Northstar', r.data)
+        self.assertIn(b'id="dashboard"', r.data)
+        self.assertIn(b'Calculate your potential value', r.data)
+        self.assertNotIn(b'Business health check</button>', r.data)
 
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})

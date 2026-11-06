@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Northstar — Your AI business dashboard</title>
+<style>
+:root{--ink:#162336;--muted:#687587;--line:#e5eaf0;--page:#f7f8f7;--blue:#345fe7;--teal:#108c78;--amber:#c37923;--violet:#6b4cbd}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}a:hover{text-decoration:none}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #f0b651;outline-offset:3px}
+[hidden]{display:none!important}.top{height:72px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1240px)/2));gap:16px}
+.logo{font-size:21px;font-weight:850;letter-spacing:-.9px;display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}.logo-mark{background:#172942;color:white;border-radius:11px;display:grid;place-items:center;width:35px;height:35px;font-size:22px}.logo span:last-child{color:var(--blue)}.top-actions{display:flex;align-items:center;gap:12px}.top-hint{color:#8a95a5;font-size:12px}
+.shell{max-width:1240px;margin:auto;padding:36px 24px 72px}.eyebrow{display:block;color:var(--blue);font-size:11px;font-weight:850;letter-spacing:1.55px;text-transform:uppercase;margin-bottom:11px}
+h1,h2,h3,p{margin:0}h1{font-size:clamp(31px,4vw,52px);letter-spacing:-2px;line-height:1.13}h2{font-size:24px;letter-spacing:-.8px;line-height:1.18}h3{font-size:16px;letter-spacing:-.35px}p{color:var(--muted)}.caption{font-size:12px;color:var(--muted)}.small{font-size:13px}.muted{color:var(--muted)}.title-row{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:20px}
+.btn{border:0;border-radius:11px;padding:11px 17px;background:var(--ink);color:white;font-weight:750;display:inline-flex;align-items:center;gap:9px;justify-content:center;white-space:nowrap}.btn:hover{filter:brightness(1.1)}.btn.light{background:white;color:#263b54;border:1px solid #d9e0ea}.btn.blue{background:var(--blue)}.btn.ghost{background:transparent;color:#46546a;border:1px solid var(--line)}
+.card{background:white;border:1px solid var(--line);border-radius:20px;padding:23px;min-width:0}.card-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}.card-head p{font-size:13px;margin-top:5px}.label{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:850;letter-spacing:1.15px;text-transform:uppercase;margin-bottom:11px}.dot{height:9px;width:9px;border-radius:50%;display:inline-block;background:currentColor}
+#setup{display:grid;grid-template-columns:.87fr 1.13fr;gap:40px;align-items:start;padding-top:18px}.setup-copy{padding:35px 22px 0 0}.setup-copy p{font-size:17px;margin-top:20px;max-width:390px}.setup-value{margin-top:30px;display:grid;gap:11px}.setup-value div{display:flex;align-items:center;gap:12px;font-weight:650;color:#3d4a60}.setup-value b{display:grid;place-items:center;border-radius:8px;background:#e7ebff;color:var(--blue);width:28px;height:28px}
+form .fields{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}label.field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:750;color:#3b4b60}label.field.wide{grid-column:1/-1}
+input:not([type=checkbox]):not([type=file]),select,textarea{width:100%;border:1px solid #d8dfe9;background:white;border-radius:10px;padding:11px 12px;min-height:44px;color:#253248}textarea{resize:vertical;min-height:80px}.submit-line{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-top:20px}.err{color:#a62f42;background:#fff0ee;padding:12px;border-radius:10px;font-size:13px;margin-top:12px}
+.dash-title{margin-bottom:22px}.dash-title h1{font-size:clamp(29px,3vw,39px)}.dash-title p{margin-top:7px}.profile-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}.chip{border:1px solid #e0e5ec;background:white;padding:6px 11px;border-radius:999px;font-size:12px;color:#506078;font-weight:650}
+.columns{display:grid;grid-template-columns:minmax(0,1.62fr) minmax(290px,1fr);gap:18px;margin-bottom:18px}.full{margin-bottom:18px}
+.spotlight{background:linear-gradient(138deg,#2648a2,#345ee3 78%,#4d70ee);border:0;color:white;padding:29px;min-height:330px;position:relative;overflow:hidden}.spotlight:after{content:"";position:absolute;border:45px solid #ffffff0d;border-radius:50%;width:320px;height:320px;right:-160px;top:-160px;pointer-events:none}.spotlight *{position:relative;z-index:1}.spotlight .label{color:#d5dfff}.spotlight h2{font-size:clamp(26px,3vw,36px);letter-spacing:-1.25px;margin-bottom:12px}.spotlight p{color:#e2e8ff}.spotlight .reason{margin-top:17px;font-size:13px}.spotlight-inner{display:grid;grid-template-columns:1fr;gap:6px;border:1px solid #ffffff4b;background:#ffffff17;padding:14px;border-radius:12px;margin-top:21px}.spotlight-inner b{font-size:13px}.spotlight-inner p{font-size:12px;color:#e8edff}.spotlight-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}.spotlight .btn{background:white;color:#2345a5}.spotlight .btn.outline{background:transparent;border:1px solid #adc0ff;color:white}
+.track{border-top:5px solid var(--amber);background:#fffdf9}.track .label{color:#9b611e}.track h2{margin-bottom:7px}.track-state{background:#fff1db;border-radius:10px;padding:10px 12px;color:#845016;font-size:12px;margin:16px 0}.bar{height:8px;background:#ebedf2;border-radius:100px;overflow:hidden;margin:12px 0}.bar>div{height:100%;background:#d69840;border-radius:100px;transition:width .2s}.task{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid #f0ebdf;font-size:13px;color:#39465a;cursor:pointer}.task input{width:18px;height:18px;accent-color:#bd7a23;margin:2px 0 0;flex-shrink:0}.task small{display:block;color:#8993a0;font-size:11px;margin-top:2px}.task input:checked+span{text-decoration:line-through;color:#8993a0}
+.readiness-strip{display:flex;gap:14px;align-items:center;border-radius:14px;padding:15px 18px;background:#f0f7f4;border:1px solid #cfe8df;margin-bottom:18px}.ready-icon{width:42px;height:42px;border-radius:11px;background:#d7eee5;color:#167862;font-weight:850;display:grid;place-items:center;flex-shrink:0}.readiness-strip b{color:#1d6b58}.readiness-strip p{font-size:12px;margin-top:2px}.readiness-strip .warn{color:#925b1f}
+.cost{background:#edfaf5;border:1px solid #cceade}.cost .label{color:var(--teal)}.cost-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.cost-grid label{font-size:12px;font-weight:750;color:#44675d}.cost-grid input{margin-top:6px!important;background:white}.savings{border-top:1px solid #c8e8d9;display:flex;align-items:end;justify-content:space-between;gap:12px;margin-top:17px;padding-top:15px}.savings strong{font-size:31px;color:#087a5b;letter-spacing:-1px}.cost .caption{color:#537b70}
+.tools .label{color:var(--blue)}.tool-options{display:grid;gap:9px}.tool-option{border:1px solid #e2e7ef;background:#fff;border-radius:12px;padding:12px;text-align:left;display:flex;align-items:center;gap:10px;width:100%}.tool-option.selected{background:#edf1ff;border-color:#7f9aff}.tool-option b{display:block;font-size:14px}.tool-option small{font-size:11px;color:#8492a6}.score{margin-left:auto;white-space:nowrap;font-size:12px;font-weight:850;color:var(--blue)}.tool-detail{background:#f6f8fe;border-radius:12px;padding:13px;margin-top:14px;font-size:12px}.tool-detail p{margin:6px 0}.review-link{display:inline-block;font-weight:700;margin-top:9px;font-size:12px}.tool-note{font-size:11px;color:#8290a4;margin-top:8px}
+.workflow-card{border-top:5px solid var(--violet)}.workflow-card .label{color:var(--violet)}.toggle{display:inline-flex;padding:3px;background:#f0edf9;border-radius:9px;gap:3px}.toggle button{border:0;border-radius:7px;background:transparent;color:#6e6187;padding:8px 11px;font-size:12px;font-weight:750}.toggle button.active{background:var(--violet);color:white}.flow-list{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:18px}.flow-step{border:1px solid #e8e0f7;background:#faf8ff;border-radius:11px;padding:12px 10px;text-align:left;min-height:96px;color:#45386c;font-size:12px;display:flex;flex-direction:column;gap:9px}.flow-step b{font-size:11px;color:#907abb}.flow-step.selected{border:2px solid #7b5cc3;padding:11px 9px;background:#f0e9fd}.flow-explain{background:#f4effc;color:#5d4d7e;padding:12px 14px;border-radius:10px;font-size:12px;margin-top:12px;min-height:48px}
+.test-card{border-top:5px solid #e38f5a}.test-card .label{color:#be6b3d}.sample-output{padding:14px;background:#fff6ef;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;color:#644b3a;font-size:13px;min-height:92px;margin:13px 0}.test-card .btn{background:#c96f3d}
+.advanced{margin-top:18px;background:white;border:1px dashed #dce1ea;border-radius:14px;padding:14px 19px}.advanced summary{cursor:pointer;font-weight:750;color:#425371;font-size:13px}.advanced-content{margin-top:15px;display:grid;gap:12px}.inline-form{display:flex;align-items:end;gap:9px;flex-wrap:wrap}.inline-form label{flex:1;min-width:220px}.inline-form .btn{padding:12px}.research-result{font-size:12px;color:#536376;padding:10px;background:#f4f7fb;border-radius:9px;margin-top:8px}.bottom-note{font-size:11px;color:#97a0ae;margin-top:26px}
+#print-area{display:none}
+@media(max-width:920px){.columns{grid-template-columns:1fr}.spotlight{min-height:0}.flow-list{grid-template-columns:repeat(2,1fr)}#setup{grid-template-columns:1fr;gap:20px}.setup-copy{padding:0}}
+@media(max-width:600px){.shell{padding:24px 14px 46px}.top{height:64px;padding:0 14px}.top-hint{display:none}.card{padding:19px}.title-row{align-items:start;flex-wrap:wrap}.columns{gap:12px;margin-bottom:12px}.form .fields,form .fields{grid-template-columns:1fr}h1{letter-spacing:-1.1px}.submit-line{flex-direction:column;align-items:stretch}.flow-list{grid-template-columns:repeat(2,1fr)}.cost-grid{grid-template-columns:repeat(2,1fr)}.top-actions .btn{padding:9px 11px;font-size:12px}}
+@media print{@page{margin:16mm}body{background:white}.top,.shell{display:none!important}#print-area{display:block!important;padding:0;color:#182536;font:13px/1.5 Arial,sans-serif}#print-area h1{font-size:26px;letter-spacing:-1px}#print-area h2{font-size:17px;margin:17px 0 5px}#print-area ul{padding-left:20px}#print-area p{color:#344155}#print-area .print-meta{border-bottom:2px solid #182536;padding-bottom:12px}}
+</style>
+</head>
+<body>
+<header class="top">
+<a class="logo" href="/" aria-label="Northstar home"><span class="logo-mark">✳</span> Northstar<span>AI</span></a>
+<div class="top-actions"><span class="top-hint">Small business solution workspace</span>
+<button id="edit-btn" class="btn light" hidden>Edit business</button><button id="export-btn" class="btn" hidden>Save my plan ↓</button></div>
+</header>
+<main class="shell">
+<section id="setup" aria-label="Set up your business">
+ <div class="setup-copy"><span class="eyebrow">YOUR SMALL BUSINESS COPILOT</span><h1>Less searching.<br>Better decisions.</h1>
+ <p>Tell us what your business needs. We'll show you one clear starting point, what it'll cost, and how to get it working.</p>
+ <div class="setup-value"><div><b>1</b> See what you can already use</div><div><b>2</b> Compare the best-fitting tools</div><div><b>3</b> Follow a simple action plan</div></div>
+ </div>
+ <form id="profile-form" class="card" autocomplete="off">
+  <span class="label" style="color:var(--blue)">✦ YOUR BUSINESS AT A GLANCE</span>
+  <div class="fields">
+   <label class="field">Business name<input name="business" value="Maple Street Coffee" maxlength="55" required></label>
+   <label class="field">Business type<select name="industry"><option value="coffee">Coffee shop / café</option><option value="restaurant">Restaurant</option><option value="retail">Retail or boutique</option><option value="hvac">HVAC / home services</option><option value="landscaping">Landscaping</option><option value="services">Other local service</option></select></label>
+   <label class="field">Biggest challenge<select name="problem"><option value="retention">Getting customers to return</option><option value="marketing">Attracting more customers</option><option value="finance">Managing money and expenses</option><option value="website">Building an online presence</option><option value="support">Responding to customer questions</option><option value="scheduling">Handling bookings</option><option value="admin">Repetitive admin tasks</option></select></label>
+   <label class="field">Monthly budget<select name="budget"><option value="0">$0</option><option value="30">Up to $30</option><option value="75" selected>Up to $75</option><option value="150">Up to $150</option><option value="500">Up to $500</option></select></label>
+   <label class="field">What do you already use?<select name="software"><option>Square</option><option>Shopify</option><option>QuickBooks</option><option>Google Sheets</option><option>Wix</option><option>None</option></select></label>
+   <label class="field">Comfort with technology<select name="comfort"><option value="beginner">Keep it simple</option><option value="intermediate">I use apps regularly</option><option value="advanced">I'm comfortable setting up tools</option></select></label>
+   <label class="field">Business data available?<select name="data_available"><option value="unsure">Not sure</option><option value="yes">Yes, I can export it</option><option value="some">Some, but incomplete</option><option value="no">Not yet</option></select></label>
+   <label class="field">Permission to market to customers?<select name="consent"><option value="unsure">Need to check</option><option value="yes">Yes, customers opted in</option><option value="no">No / not applicable</option></select></label>
+   <label class="field wide">Anything else we should know? (optional)<textarea name="challengeText" rows="2" placeholder="Example: I want to bring regular customers back without more ad spending."></textarea></label>
+  </div>
+  <div class="submit-line"><span class="caption">No real integrations or purchases are made.</span><button id="submit-btn" class="btn blue" type="submit">Build my dashboard →</button></div>
+  <div id="setup-error" role="alert" hidden></div>
+ </form>
+</section>
+<section id="dashboard" hidden aria-label="Your business dashboard">
+ <div class="dash-title title-row"><div><span class="eyebrow">YOUR DECISION DASHBOARD</span><h1 id="hello">Here's your next best step</h1><p>One place to compare a solution, estimate its value, and track what comes next.</p>
+ <div class="profile-strip" id="profile-strip"></div></div></div>
+ <div class="columns">
+  <article class="card spotlight" aria-labelledby="top-title"><span class="label"><span class="dot"></span> 01 · WHAT SHOULD I DO?</span>
+   <h2 id="top-title">Your suggested starting point</h2><p id="main-reason"></p>
+   <div class="spotlight-inner"><b id="reuse-title">Start with what you own</b><p id="reuse-note"></p></div>
+   <div class="spotlight-actions"><button id="compare-jump" class="btn">Compare options ↓</button><button id="try-jump" class="btn outline">Try an example ↗</button></div>
+  </article>
+  <article class="card track"><span class="label"><span class="dot"></span> 03 · YOUR NEXT STEPS</span><h2>A simple plan to follow</h2><p class="small">Check off a step when you have completed it.</p>
+   <div id="track-state" class="track-state"></div><div class="bar" aria-label="Plan progress"><div id="track-bar"></div></div><div id="task-list"></div>
+   <p class="caption" style="margin-top:12px">Progress is saved in this browser; it doesn't connect to outside accounts.</p>
+  </article>
+ </div>
+ <div class="readiness-strip"><div class="ready-icon" id="readiness-score">?</div><div><b id="readiness-label">Your starting point</b><p id="readiness-detail"></p></div></div>
+ <div class="columns">
+  <article class="card tools" id="compare-section"><span class="label"><span class="dot"></span> 02 · COMPARE THE OPTIONS</span>
+   <div class="card-head"><div><h2>Explore suitable tools</h2><p>See alternatives without having to start your search over.</p></div></div>
+   <div id="tool-options" class="tool-options"></div><div id="tool-detail" class="tool-detail"></div>
+   <p class="tool-note">Fit scores are illustrative, not independent ratings. Vendor pricing and integrations require verification.</p>
+  </article>
+  <article class="card cost"><span class="label"><span class="dot"></span> 02 · IS IT WORTH THE MONEY?</span>
+   <div class="card-head"><div><h2>Calculate your potential value</h2><p>Change the numbers to match your business.</p></div></div>
+   <div class="cost-grid">
+    <label>Software per month ($)<input id="cost-software" type="number" min="0" value="35"></label>
+    <label>Other fees / month ($)<input id="cost-extra" type="number" min="0" value="15"></label>
+    <label>Hours saved / month<input id="cost-hours" type="number" min="0" value="8"></label>
+    <label>Value per hour ($)<input id="cost-rate" type="number" min="0" value="20"></label>
+    <label>One-time setup ($)<input id="cost-setup" type="number" min="0" value="100"></label>
+   </div>
+   <div class="savings"><div><span class="caption">Estimated monthly net value</span><div><strong id="cost-net">$110</strong></div></div><div class="caption" id="payback"></div></div>
+   <p class="caption" id="cost-year" style="margin-top:10px"></p><p class="caption" style="margin-top:10px">Model only: hours saved are valued labor time, not guaranteed cash savings. The tool price is an assumption, not a verified quote.</p>
+  </article>
+ </div>
+ <div class="columns">
+  <article class="card workflow-card"><span class="label"><span class="dot"></span> HOW WOULD IT WORK?</span>
+   <div class="card-head"><div><h2>Your business workflow</h2><p>Explore the process, step by step. Select a step for more detail.</p></div>
+    <div class="toggle" role="group" aria-label="Workflow view"><button class="active" id="flow-before" type="button">Today</button><button id="flow-after" type="button">With a tool</button></div>
+   </div>
+   <div id="flow-list" class="flow-list"></div><div class="flow-explain" id="flow-explain" aria-live="polite"></div>
+  </article>
+  <article class="card test-card" id="try-section"><span class="label"><span class="dot"></span> TRY BEFORE YOU BUY</span>
+   <h2 id="demo-title">See a sample output</h2><p class="small" id="demo-intro" style="margin:8px 0 13px">Explore a preview of what this type of solution might produce.</p>
+   <button class="btn" id="preview-btn" type="button">Generate a sample →</button><div class="sample-output" id="preview-output" aria-live="polite">No vendor accounts are needed for this example.</div>
+   <p class="caption">Created by this prototype, not the recommended vendor. Nothing is sent to your customers.</p>
+  </article>
+ </div>
+ <details class="advanced"><summary>More tools for exploring (optional)</summary>
+ <div class="advanced-content">
+  <div><h3>Analyze a sample customer CSV</h3><p class="small">For customer-retention examples. Required columns: customer_id, date, amount.</p>
+   <div class="inline-form"><a href="/static/sample_customers.csv" class="btn light" download>Download sample CSV</a>
+    <form id="csv-form" class="inline-form"><label class="field">Choose file<input id="csv-file" type="file" accept=".csv,text/csv" required></label><button type="submit" class="btn blue">Analyze</button></form></div><div class="research-result" id="csv-result" hidden></div></div>
+  <div><h3>Research another vendor tool</h3><p class="small">Extract a draft description from a supported official vendor website. Details require human review.</p>
+   <form class="inline-form" id="discover-form"><label class="field">Official HTTPS product link<input type="url" id="discover-url" value="https://www.wix.com/website-builder" required></label><button class="btn ghost" type="submit">Look up tool</button></form><div id="discover-result" class="research-result" hidden></div></div>
+ </div></details>
+ <p class="bottom-note">Northstar AI · Hackathon prototype · No outside accounts are connected · Verify all pricing, feature, security and integration claims before adoption.</p>
+</section>
+</main>
+<div id="print-area" aria-hidden="true"></div>
+<script>
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const url=v=>{try{let u=new URL(v);return u.protocol==='https:'?u.href:'#'}catch{return '#'}};
+let profile={},report=null,toolIndex=0,completed=[],view='before',costModel={};
+const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
+function jump(id){$(id).scrollIntoView({behavior:'smooth',block:'start'});}
+function note(el,text){el.hidden=false;el.textContent=text;}
+function stepsKey(){return 'northstar-simple-plan:'+String(profile.business||'demo').toLowerCase()+':'+String(report?.problem||'unknown');}
+function progressLoad(){try{const saved=JSON.parse(localStorage.getItem(stepsKey())||'[]');completed=report.steps.map((s,i)=>saved[i]===true)}catch{completed=report.steps.map(()=>false)}}
+function renderProgress(){
+ const next=report.steps.findIndex((s,i)=>!completed[i]);const done=completed.filter(Boolean).length;
+ $('track-bar').style.width=(100*done/report.steps.length)+'%';
+ $('track-state').textContent=next<0?'All steps marked complete. Time to measure results.':'Next up: '+report.steps[next];
+ $('task-list').innerHTML=report.steps.map((s,i)=>`<label class="task"><input type="checkbox" data-step="${i}" ${completed[i]?'checked':''}><span>${esc(s)}<small>Step ${i+1} of ${report.steps.length}</small></span></label>`).join('');
+ $('task-list').querySelectorAll('input').forEach(input=>input.addEventListener('change',()=>{completed[Number(input.dataset.step)]=input.checked;try{localStorage.setItem(stepsKey(),JSON.stringify(completed))}catch{}renderProgress()}));
+}
+function renderReadiness(){
+ const a=report.readiness||{score:0,status:'Needs review',blockers:[],next_steps:[]};
+ $('readiness-score').textContent=a.score+'/100';
+ $('readiness-label').textContent='Getting ready: '+a.status;
+ const first=(a.blockers||[])[0]||(a.next_steps||[])[0]||'Your next step is to test with sample data and review the tool details.';
+ $('readiness-detail').textContent=first+' Readiness is based only on your answers, not an external audit.';
+ const audit=report.software_audit||{};
+ $('reuse-title').textContent='Before buying anything: review '+(audit.software||profile.software);
+ $('reuse-note').textContent=audit.try_first||'Check what your current tools can already do.';
+}
+function renderTools(){
+ const tools=report.tools||[];if(!tools.length)return;
+ $('tool-options').innerHTML=tools.map((t,i)=>`<button type="button" class="tool-option ${i===toolIndex?'selected':''}" data-tool="${i}" aria-pressed="${i===toolIndex}"><span><b>${esc(t.name)} ${i===0?'✦':''}</b><small>${i===0?'Suggested starting option':'Alternative to compare'} · ${esc(t.category)}</small></span><span class="score">${esc(t.score)}/100</span></button>`).join('');
+ $('tool-options').querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>{toolIndex=Number(b.dataset.tool);renderTools()}));
+ const t=tools[toolIndex],e=t.review_evidence||{};
+ $('tool-detail').innerHTML=`<strong>${esc(t.name)}</strong><p>${esc(t.description)}</p><p>${(t.reasons||[]).map(esc).join(' · ')}</p>
+ <p><b>Pricing:</b> ${esc(t.pricing||'Check provider')}</p>
+ <a href="${url(t.site)}" target="_blank" rel="noopener noreferrer">Check official product details ↗</a><br>
+ <a class="review-link" href="${url(e.search_url||'https://www.g2.com/')}" target="_blank" rel="noopener noreferrer">Read real customer reviews on G2 ↗</a>
+ <p class="caption">Look for reviewers with a similar industry, team size and use case. We do not invent review quotes or ratings.</p>`;
+}
+function calcCost(){
+ const val=id=>Math.max(0,Number($(id).value)||0);const monthly=val('cost-software')+val('cost-extra');
+ const value=val('cost-hours')*val('cost-rate'),net=value-monthly,setup=val('cost-setup');
+ costModel={monthly,monthlyLaborValue:value,net,setup,yearOne:12*net-setup,payback:net>0?setup/net:null};
+ $('cost-net').textContent=money(net);$('cost-net').style.color=net<0?'#a43b33':'#087a5b';
+ $('payback').textContent=net>0?'Setup payback: '+costModel.payback.toFixed(1)+' months':'No payback at these assumptions';
+ $('cost-year').textContent='Estimated first-year net value: '+money(costModel.yearOne);
+}
+function renderFlow(){
+ const b=report.blueprint||{},items=(view==='before'?b.before:b.after)||[];
+ $('flow-before').classList.toggle('active',view==='before');$('flow-after').classList.toggle('active',view==='after');
+ $('flow-list').innerHTML=items.map((s,i)=>`<button class="flow-step ${i===0?'selected':''}" type="button" data-flow="${i}"><b>STEP 0${i+1}</b><span>${esc(s)}</span></button>`).join('');
+ function pick(i){$('flow-list').querySelectorAll('button').forEach((x,j)=>x.classList.toggle('selected',j===i));
+ $('flow-explain').textContent=(view==='before'?'Current way: ':'Proposed way: ')+items[i]+'. '+(view==='after'?'This is a suggested process, not a connected integration.':'Review the effort and mistakes possible at this stage.');}
+ $('flow-list').querySelectorAll('button').forEach((x,i)=>x.addEventListener('click',()=>pick(i)));if(items.length)pick(0);
+}
+const previewSamples={
+ finance:'Example expense insight (synthetic figures):\\nUtilities increased from $420 to $510 this month. Review the increase before changing your budget.\\n\\nNext: check categories and verify totals with a human.',
+ website:'Example homepage draft:\\nWelcome to your neighborhood business. Discover what makes our service different, explore our offerings, and get in touch.\\n\\nBefore publishing: verify hours, address, accessibility and claims.',
+ support:'Example approved FAQ response:\\nThanks for reaching out! Our team would be happy to help. Please share what service you need, and a staff member can confirm the details.\\n\\nEscalate uncertain questions to a human.',
+ scheduling:'Example appointment reminder:\\nHello! This is a friendly reminder of your upcoming appointment. Please contact us if you need to reschedule.\\n\\nConfirm that reminders are enabled only for opted-in customers.',
+ admin:'Example automation plan:\\n1. New form submission arrives.\\n2. Validate required fields.\\n3. Add to a tracking spreadsheet.\\n4. Flag exceptions for staff approval.\\n\\nThis is a proposed workflow, not a live automation.'
+};
+async function runPreview(){
+ const problem=report.problem,btn=$('preview-btn');btn.disabled=true;btn.textContent='Generating…';
+ try{
+  if(problem==='retention'||problem==='marketing'){
+   const r=await fetch('/api/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({business:profile.business})});
+   const j=await r.json();if(!r.ok)throw Error(j.error||'Could not generate');
+   $('preview-output').textContent=j.content+'\n\n['+j.mode+']';
+  } else $('preview-output').textContent=(previewSamples[problem]||previewSamples.admin).replaceAll('\\n','\n')+'\n\n[Illustrative template]';
+ }catch(e){$('preview-output').textContent='Preview unavailable: '+e.message}finally{btn.disabled=false;btn.textContent='Generate another example →'}
+}
+function renderDashboard(){
+ $('hello').textContent='A clearer path for '+(profile.business||'your business');
+ const industry=$('profile-form').elements.industry.selectedOptions[0]?.textContent||profile.industry;
+ const problem=$('profile-form').elements.problem.selectedOptions[0]?.textContent||report.problem;
+ $('profile-strip').innerHTML=[industry,problem,'Budget: '+money(Number(profile.budget||0))+'/mo','Already using: '+profile.software].map(x=>'<span class="chip">'+esc(x)+'</span>').join('');
+ const primary=report.tools?.[0];$('top-title').textContent=primary?'Start by exploring '+primary.name:'Start by reviewing your current software';
+ $('main-reason').textContent=primary?('Why this fits: '+(primary.reasons||[]).slice(0,2).join(' · ')):'Check which features you already have before buying something new.';
+ toolIndex=0;renderReadiness();renderTools();progressLoad();renderProgress();renderFlow();calcCost();
+ $('demo-title').textContent=(report.problem==='retention'||report.problem==='marketing')?'Try a sample customer campaign':'See an example for your business';
+ $('preview-output').textContent='Click “Generate a sample” to explore an illustrative output.';
+ $('setup').hidden=true;$('dashboard').hidden=false;$('edit-btn').hidden=false;$('export-btn').hidden=false;window.scrollTo({top:0,behavior:'smooth'});
+}
+$('profile-form').addEventListener('submit',async event=>{
+ event.preventDefault();const btn=$('submit-btn');btn.disabled=true;btn.textContent='Building your dashboard…';
+ profile=Object.fromEntries(new FormData(event.currentTarget));
+ try{const response=await fetch('/api/recommend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(profile)});
+ const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to create recommendations');report=data;renderDashboard();$('setup-error').hidden=true;}
+ catch(error){note($('setup-error'),'Unable to build your dashboard: '+error.message);$('setup-error').className='err';}
+ finally{btn.disabled=false;btn.textContent='Build my dashboard →'}
+});
+$('edit-btn').addEventListener('click',()=>{$('dashboard').hidden=true;$('setup').hidden=false;$('edit-btn').hidden=true;$('export-btn').hidden=true;window.scrollTo({top:0,behavior:'smooth'})});
+$('compare-jump').addEventListener('click',()=>jump('compare-section'));$('try-jump').addEventListener('click',()=>jump('try-section'));
+$('flow-before').addEventListener('click',()=>{view='before';renderFlow()});$('flow-after').addEventListener('click',()=>{view='after';renderFlow()});
+['cost-software','cost-extra','cost-hours','cost-rate','cost-setup'].forEach(id=>$(id).addEventListener('input',calcCost));
+$('preview-btn').addEventListener('click',runPreview);
+$('export-btn').addEventListener('click',()=>{
+ if(!report)return;const top=report.tools?.[0];const audit=report.software_audit||{};const r=report.readiness||{};
+ $('print-area').innerHTML=`<div class="print-meta"><span>Northstar AI · Decision Passport</span><h1>${esc(profile.business)}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
+ <h2>Starting point</h2><p>Current software: ${esc(profile.software)} · Budget: ${money(Number(profile.budget||0))}/month · Readiness estimate: ${esc(r.score)}/100</p><p>${esc(audit.try_first||'Check existing software features.')}</p>
+ <h2>Suggested tool to investigate</h2><p>${esc(top?.name||'None')} (illustrative fit ${esc(top?.score||'?')}/100). ${esc(top?.description||'')}</p>
+ <h2>Financial model (user assumptions)</h2><p>Monthly cost: ${money(costModel.monthly||0)}. Monthly value: ${money(costModel.net||0)}. First year: ${money(costModel.yearOne||0)}. Figures are estimates, not guaranteed cash savings.</p>
+ <h2>Action plan</h2><ul>${report.steps.map((x,i)=>'<li>'+esc(completed[i]?'Completed: ':'Next: ')+esc(x)+'</li>').join('')}</ul>
+ <h2>Before purchasing</h2><p>Verify vendor pricing, feature availability, integrations, data rights and privacy rules. No real vendor accounts are connected. Reviews should be checked on independent source sites.</p>`;
+ window.print();
+});
+$('csv-form').addEventListener('submit',async event=>{
+ event.preventDefault();const el=$('csv-result');note(el,'Analyzing sample data…');
+ const file=$('csv-file').files[0];if(!file){note(el,'Select a CSV.');return}
+ try{const form=new FormData();form.append('file',file);
+ const r=await fetch('/api/analyze',{method:'POST',body:form}),d=await r.json();if(!r.ok)throw Error(d.error||'Analysis failed');
+ note(el,`${d.customers} customers · ${d.orders} orders · ${d.repeat_rate}% repeat purchase share. ${d.insight}`);
+ }catch(e){note(el,e.message)}
+});
+$('discover-form').addEventListener('submit',async event=>{
+ event.preventDefault();const el=$('discover-result');note(el,'Checking official product page…');
+ try{const r=await fetch('/api/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('discover-url').value})});
+ const d=await r.json();if(!r.ok)throw Error(d.error||'Could not retrieve tool');
+ note(el,`${d.title}: ${d.summary} — ${d.status}. Source: ${d.source}`);}
+ catch(e){note(el,e.message)}
+});
+</script>
+</body>
+</html>
