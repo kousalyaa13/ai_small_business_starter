@@ -20,6 +20,8 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from advisor import assess, audit, blueprint, reviews_for
 from agent.api import bp as agent_bp
+from agent.pricing import choose_plan
+from agent.schemas import Plan, Usage
 from agent.safe_fetch import FetchError, SafeFetcher
 from agent.service import AgentService
 
@@ -83,6 +85,17 @@ def guess_problem(text: str, explicit: str | None):
     return max(scores, key=scores.get) if max(scores.values()) else "marketing"
 
 
+def price_estimate(tool, profile):
+    """Cheapest catalog plan for one user, with its source; None when the price is unknown."""
+    choice = choose_plan([Plan(**p) for p in tool.get("plans", [])], Usage())
+    if choice.plan is None or choice.monthly_cost is None:
+        return None
+    limit = BUDGETS.get(str(profile.get("budget")))
+    return {"plan": choice.plan.name, "monthly_cost": choice.monthly_cost, "billing": choice.plan.billing,
+            "source_url": tool.get("pricing_source_url", ""), "checked_at": tool.get("pricing_checked_at", ""),
+            "within_budget": None if limit is None else choice.monthly_cost <= limit}
+
+
 def score_tool(tool, profile, problem):
     software = profile.get("software", "None")
     industry = profile.get("industry", "coffee")
@@ -91,8 +104,8 @@ def score_tool(tool, profile, problem):
     exact = problem in tool["problems"]
     need = 100 if exact else 25
     compatibility = 100 if software in tool["integrations"] else (65 if software == "None" else 40)
-    # Pricing remains unverified: neutral, not a fabricated price-fit claim.
-    budget = 50
+    price = price_estimate(tool, profile)
+    budget = {True: 100, False: 30, None: 50}[price["within_budget"] if price else None]
     ease = {"easy": 100, "medium": 65, "advanced": 30}[difficulty]
     if comfort == "advanced":
         ease = min(100, ease + 25)
@@ -112,7 +125,7 @@ def score_tool(tool, profile, problem):
     if difficulty == "easy":
         reasons.append("Lower estimated setup complexity")
     return {**tool, "score": max(0, score), "reasons": reasons[:3],
-            "verified": False, "price_estimate": None,
+            "verified": False, "price_estimate": price,
             "important_note": "Demo match score. Confirm vendor pricing, AI feature access and integrations before adoption."}
 
 
@@ -293,4 +306,5 @@ app.extensions["agent_service"] = AgentService.create(DB_PATH)
 app.extensions["agent_service"].runner.recover()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # 5000 is taken by macOS AirPlay Receiver, which answers with "403 Access denied".
+    app.run(debug=True, port=int(os.environ.get("PORT", 5050)))

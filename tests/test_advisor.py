@@ -14,6 +14,10 @@ class AdvisorTests(unittest.TestCase):
     def test_marketing_consent_is_a_blocker(self):
         result = assess({**self.profile,"consent":"unsure"}, "retention")
         self.assertTrue(any("consent" in item.lower() for item in result["blockers"]))
+    def test_skipped_questions_are_not_blockers(self):
+        result = assess({"software":"Square","budget":"75"}, "retention")
+        self.assertEqual(result["blockers"], [])
+        self.assertEqual(set(result["unanswered"]), {"data_available","consent"})
     def test_existing_software_needs_verification(self):
         value = audit(self.profile, "retention")
         self.assertIn("Square", value["software"])
