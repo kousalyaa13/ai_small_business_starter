@@ -16,12 +16,17 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from advisor import assess, audit, blueprint, reviews_for
+from agent.api import bp as agent_bp
+from agent.pricing import choose_plan
+from agent.schemas import Plan, Usage
+from agent.safe_fetch import FetchError, SafeFetcher
+from agent.service import AgentService
 
 BASE = Path(__file__).resolve().parent
+load_dotenv(BASE / ".env")  # API keys live in the git-ignored .env; real env vars take precedence
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE / "tools.db")))
 PROBLEMS = {
     "retention": ["retain", "return", "repeat", "loyal", "churn", "come back", "customers aren't returning"],
@@ -60,12 +65,11 @@ def init_db():
             use_case TEXT, rating INTEGER, comment TEXT,
             evidence_url TEXT, created_at TEXT, status TEXT
         )""")
-        count = con.execute("SELECT COUNT(*) FROM tools").fetchone()[0]
-        if not count:
-            catalog = json.loads((BASE / "data" / "tools.json").read_text())
-            con.executemany("INSERT INTO tools (id, name, payload) VALUES (?,?,?)", [
-                (tool["id"], tool["name"], json.dumps(tool)) for tool in catalog
-            ])
+        # Refresh from the catalog file on start so pricing updates reach existing databases.
+        catalog = json.loads((BASE / "data" / "tools.json").read_text())
+        con.executemany("INSERT OR REPLACE INTO tools (id, name, payload) VALUES (?,?,?)", [
+            (tool["id"], tool["name"], json.dumps(tool)) for tool in catalog
+        ])
 
 
 def get_tools():
@@ -81,6 +85,17 @@ def guess_problem(text: str, explicit: str | None):
     return max(scores, key=scores.get) if max(scores.values()) else "marketing"
 
 
+def price_estimate(tool, profile):
+    """Cheapest catalog plan for one user, with its source; None when the price is unknown."""
+    choice = choose_plan([Plan(**p) for p in tool.get("plans", [])], Usage())
+    if choice.plan is None or choice.monthly_cost is None:
+        return None
+    limit = BUDGETS.get(str(profile.get("budget")))
+    return {"plan": choice.plan.name, "monthly_cost": choice.monthly_cost, "billing": choice.plan.billing,
+            "source_url": tool.get("pricing_source_url", ""), "checked_at": tool.get("pricing_checked_at", ""),
+            "within_budget": None if limit is None else choice.monthly_cost <= limit}
+
+
 def score_tool(tool, profile, problem):
     software = profile.get("software", "None")
     industry = profile.get("industry", "coffee")
@@ -89,8 +104,8 @@ def score_tool(tool, profile, problem):
     exact = problem in tool["problems"]
     need = 100 if exact else 25
     compatibility = 100 if software in tool["integrations"] else (65 if software == "None" else 40)
-    # Pricing remains unverified: neutral, not a fabricated price-fit claim.
-    budget = 50
+    price = price_estimate(tool, profile)
+    budget = {True: 100, False: 30, None: 50}[price["within_budget"] if price else None]
     ease = {"easy": 100, "medium": 65, "advanced": 30}[difficulty]
     if comfort == "advanced":
         ease = min(100, ease + 25)
@@ -110,7 +125,7 @@ def score_tool(tool, profile, problem):
     if difficulty == "easy":
         reasons.append("Lower estimated setup complexity")
     return {**tool, "score": max(0, score), "reasons": reasons[:3],
-            "verified": False, "price_estimate": None,
+            "verified": False, "price_estimate": price,
             "important_note": "Demo match score. Confirm vendor pricing, AI feature access and integrations before adoption."}
 
 
@@ -223,39 +238,29 @@ def discover():
     if parsed.scheme != "https" or not base_domain_allowed or parsed.port is not None or parsed.username:
         return jsonify({"error": "For this public demo, choose an HTTPS URL on a supported official vendor domain."}), 400
     try:
-        resp = requests.get(url, timeout=8, allow_redirects=False, headers={"User-Agent": "SmallBizHackathonDemo/0.1"})
-        if not resp.ok:
-            return jsonify({"error": "The vendor page did not return readable HTML. Try a different official product page."}), 422
-        if "text/html" not in resp.headers.get("content-type", ""):
-            return jsonify({"error": "This link doesn't appear to serve an HTML page."}), 422
-        soup = BeautifulSoup(resp.text[:300_000], "html.parser")
-        for junk in soup(["script", "style", "noscript", "nav", "footer"]):
-            junk.decompose()
-        title = (soup.title.get_text(" ", strip=True) if soup.title else domain)[:130]
-        meta = soup.find("meta", attrs={"name": "description"})
-        desc = (meta.get("content", "") if meta else "")[:800]
-        headings = " | ".join(h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2"], limit=8))[:1200]
-        summary = (desc or headings or soup.get_text(" ", strip=True)[:1000]).strip()
-        if not summary:
-            return jsonify({"error": "No useful product details found on the page."}), 422
-        try:
-            generated = ai_text(
-                "Extract the page's explicit product purpose and AI features, if present. "
-                "Do not invent pricing, integrations, benefits, or capabilities. "
-                "Summarize in under 90 words. Say when an AI feature is not confirmed.",
-                f"Official URL: {url}\nPage title: {title}\nExtracted text: {summary}\nHeadings: {headings}"
-            )
-        except Exception:
-            generated = None
-        candidate = generated or summary[:400]
-        with db() as con:
-            con.execute("INSERT INTO discovered(url,title,summary,evidence,created_at,status) VALUES (?,?,?,?,?,?)",
-                        (url, title, candidate, summary[:1600], date.today().isoformat(), "Needs review"))
-        return jsonify({"title": title, "summary": candidate, "source": url,
-                        "status": "Needs review", "mode": "AI extraction" if generated else "Page metadata extraction",
-                        "note": "This candidate was extracted from a vendor page but was not independently validated or added to ranked recommendations."})
-    except requests.RequestException:
-        return jsonify({"error": "The site couldn't be reached. Some vendors block automated requests."}), 422
+        page = SafeFetcher(max_redirects=0, respect_robots=False).fetch(url, allowed_domains=ALLOWED_DISCOVERY_DOMAINS)
+    except FetchError as exc:
+        return jsonify({"error": str(exc)}), 422
+    title, desc, headings = page.title[:130], page.description, page.headings
+    summary = (desc or headings or page.text[:1000]).strip()
+    if not summary:
+        return jsonify({"error": "No useful product details found on the page."}), 422
+    try:
+        generated = ai_text(
+            "Extract the page's explicit product purpose and AI features, if present. "
+            "Do not invent pricing, integrations, benefits, or capabilities. "
+            "Summarize in under 90 words. Say when an AI feature is not confirmed.",
+            f"Official URL: {url}\nPage title: {title}\nExtracted text: {summary}\nHeadings: {headings}"
+        )
+    except Exception:
+        generated = None
+    candidate = generated or summary[:400]
+    with db() as con:
+        con.execute("INSERT INTO discovered(url,title,summary,evidence,created_at,status) VALUES (?,?,?,?,?,?)",
+                    (url, title, candidate, summary[:1600], date.today().isoformat(), "Needs review"))
+    return jsonify({"title": title, "summary": candidate, "source": url,
+                    "status": "Needs review", "mode": "AI extraction" if generated else "Page metadata extraction",
+                    "note": "This candidate was extracted from a vendor page but was not independently validated or added to ranked recommendations."})
 
 
 @app.post("/api/reviews/submit")
@@ -296,6 +301,10 @@ def health():
 
 
 init_db()
+app.register_blueprint(agent_bp)
+app.extensions["agent_service"] = AgentService.create(DB_PATH)
+app.extensions["agent_service"].runner.recover()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # 5000 is taken by macOS AirPlay Receiver, which answers with "403 Access denied".
+    app.run(debug=True, port=int(os.environ.get("PORT", 5050)))

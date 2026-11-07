@@ -42,11 +42,12 @@ SOFTWARE = {
 
 def assess(profile, problem):
     software = profile.get("software", "None")
-    data = profile.get("data_available", "unsure")
-    consent = profile.get("consent", "unsure")
+    # Readiness questions are optional; skipped ones are "unanswered", not blockers.
+    data = profile.get("data_available") or None
+    consent = profile.get("consent") or None
     score = 30
     positives = ["You identified a business goal and a software budget."]
-    blockers, next_steps = [], []
+    blockers, next_steps, unanswered = [], [], []
     if software != "None":
         score += 20
         positives.append("You already have a tool to evaluate before adding another.")
@@ -58,6 +59,8 @@ def assess(profile, problem):
     elif data == "some":
         score += 12
         next_steps.append("Check whether your records are accurate and complete.")
+    elif data is None:
+        unanswered.append("data_available")
     else:
         blockers.append("Relevant data availability isn't confirmed.")
         next_steps.append("Gather a small sample dataset for testing.")
@@ -65,19 +68,27 @@ def assess(profile, problem):
         if consent == "yes":
             score += 15
             positives.append("You indicated you have opt-in records for customer outreach.")
+        elif consent is None:
+            unanswered.append("consent")
         else:
             score -= 10
             blockers.append("Marketing consent hasn't been confirmed.")
             next_steps.append("Verify customer messaging permission and unsubscribe handling.")
     else:
         score += 15
-    if profile.get("comfort") != "beginner":
+    if (profile.get("comfort") or "beginner") != "beginner":
         score += 10
     else:
         next_steps.append("Choose a guided setup with human oversight.")
+    if blockers:
+        status = "Prepare before connecting tools"
+    elif unanswered:
+        status = "Answer a couple of questions to check"
+    else:
+        status = "Limited pilot may be reasonable" if score >= 75 else "Prepare before connecting tools"
     return {"score": max(0,min(score,100)), "positives": positives,
-        "blockers": blockers, "next_steps": next_steps,
-        "status": "Limited pilot may be reasonable" if score >= 75 and not blockers else "Prepare before connecting tools",
+        "blockers": blockers, "next_steps": next_steps, "unanswered": unanswered,
+        "status": status,
         "note": "Illustrative readiness checklist based only on self-reported information, not an audit."}
 
 def audit(profile, problem):

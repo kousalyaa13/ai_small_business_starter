@@ -28,7 +28,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Browse to http://127.0.0.1:5000. The default route uses `templates/dashboard.html`. This one file contains the dashboard HTML, CSS, and vanilla JavaScript to make hackathon editing straightforward.
+Browse to http://127.0.0.1:5050 (set `PORT` to change it; macOS reserves port 5000 for AirPlay Receiver, which returns "403 Access denied"). The default route uses `templates/dashboard.html`. This one file contains the dashboard HTML, CSS, and vanilla JavaScript to make hackathon editing straightforward.
 
 ## Test
 
@@ -41,6 +41,40 @@ The profile calls `POST /api/recommend`, which returns rules-based tool matches,
 ### AI (optional)
 
 Set `OPENAI_API_KEY` on the server for the customer-email preview and vendor page summaries; **never** expose API keys in browser code or a GitHub commit. Without a key, template previews still work. The other problem-specific test drives are clearly labeled *illustrative templates*, not vendor integrations.
+
+## Consultation agent (`/consult`)
+
+Describe a business problem in plain English. The agent:
+
+1. **Breaks it into components.** Each component gets one capability tag from a fixed list (`agent/capabilities.py`). Examples: `form_capture`, `crm_contacts`, `workflow_automation`.
+2. **Checks the in-house catalog first.** `data/tools.json` lists vetted tools with capabilities and plan prices, each recorded with its source URL and the date checked.
+3. **Searches the web only for gaps.** It uses TinyFish (or Brave) to search, then reads vendor pages through TinyFish's browser-based fetch or an SSRF-guarded direct fetcher. A model extracts facts, and code keeps only those whose quoted evidence appears on the page. Web finds are always labelled *not vetted* and go to the `discovered` review queue.
+4. **Builds two or three options.** Monthly costs are calculated in code from the plans and your usage. A tool covering several parts is counted once, and unknown prices are never guessed.
+5. **Pauses for your approval.** The LangGraph run is checkpointed in SQLite, so it survives restarts. Approvals are idempotent: repeating a request returns the same record.
+
+Nothing is purchased, connected or deployed in this milestone.
+
+### Configuration (all optional)
+
+Put keys in a `.env` file in the project folder (copy `.env.example`). It is git-ignored and loaded automatically by `app.py` and `scripts/try_decompose.py`; variables exported in your shell take precedence.
+
+| Variable | Purpose |
+|---|---|
+| `OPENAI_API_KEY` | Real decomposition and extraction. Without it, a deterministic keyword stub is used. |
+| `OPENROUTER_API_KEY` | Used when `OPENAI_API_KEY` is not set. Defaults: `openai/gpt-5-mini` for decomposition, `openai/gpt-5-nano` for extraction. `OPENROUTER_MODEL` sets one model for both. |
+| `AGENT_PROVIDER` | Force `openai`, `openrouter` or `stub`, regardless of which keys are set. |
+| `OPENAI_MODEL`, `AGENT_MODEL_DECOMPOSE`, `AGENT_MODEL_EXTRACT` | Model per task (the last two default to `OPENAI_MODEL`). |
+| `TINYFISH_API_KEY` | Web research via TinyFish: its Search API finds vendors, and its Fetch API reads pages in a real browser. Used before Brave when both are set. |
+| `BRAVE_API_KEY` | Alternative search provider (pages are then fetched directly). Without any search key, gaps are reported. |
+| `AGENT_MAX_SEARCHES`, `AGENT_MAX_FETCHES`, `AGENT_MAX_MODEL_CALLS`, `AGENT_MAX_RUN_TOKENS`, `AGENT_MAX_RUN_USD` | Hard per-run limits. |
+| `AGENT_PRICE_IN_PER_MTOK`, `AGENT_PRICE_CACHED_IN_PER_MTOK`, `AGENT_PRICE_OUT_PER_MTOK`, `AGENT_PRICE_PER_SEARCH` | Unit prices for spend estimates. If unset, spend is recorded as unknown and the token limit applies. |
+
+API: `POST /api/projects`, `GET /api/projects/<id>`, `POST /api/projects/<id>/answers`, `POST /api/projects/<id>/approve`.
+
+### Not yet verified
+- Decomposition and extraction quality with a real model. The tests use the stub.
+- Brave result quality, and how often vendor pricing pages are readable without a browser.
+- Catalog prices were read on 2026-11-06. They include caveats (see `pricing_notes`), and Canva and Wix paid plans are unknown.
 
 ## What is and is not verified
 
@@ -67,6 +101,8 @@ Set `OPENAI_API_KEY` on the server for the customer-email preview and vendor pag
 
 ```
 app.py                     Flask API and data handling
+agent/                     Consultation agent (LangGraph flow, catalog matching, research, pricing, approvals)
+templates/consult.html     Problem → options → approval page
 advisor.py                 Readiness and workflow logic
 templates/dashboard.html  Single-dashboard UX and browser interactions
 data/tools.json            Initial tool catalog (research starting point)
