@@ -60,12 +60,11 @@ def init_db():
             use_case TEXT, rating INTEGER, comment TEXT,
             evidence_url TEXT, created_at TEXT, status TEXT
         )""")
-        count = con.execute("SELECT COUNT(*) FROM tools").fetchone()[0]
-        if not count:
-            catalog = json.loads((BASE / "data" / "tools.json").read_text())
-            con.executemany("INSERT INTO tools (id, name, payload) VALUES (?,?,?)", [
-                (tool["id"], tool["name"], json.dumps(tool)) for tool in catalog
-            ])
+        # Refresh from the catalog file on start so pricing updates reach existing databases.
+        catalog = json.loads((BASE / "data" / "tools.json").read_text())
+        con.executemany("INSERT OR REPLACE INTO tools (id, name, payload) VALUES (?,?,?)", [
+            (tool["id"], tool["name"], json.dumps(tool)) for tool in catalog
+        ])
 
 
 def get_tools():
