@@ -16,10 +16,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 from flask import Flask, jsonify, render_template, request
 from advisor import assess, audit, blueprint, reviews_for
+from agent.safe_fetch import FetchError, SafeFetcher
 
 BASE = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE / "tools.db")))
@@ -222,39 +221,29 @@ def discover():
     if parsed.scheme != "https" or not base_domain_allowed or parsed.port is not None or parsed.username:
         return jsonify({"error": "For this public demo, choose an HTTPS URL on a supported official vendor domain."}), 400
     try:
-        resp = requests.get(url, timeout=8, allow_redirects=False, headers={"User-Agent": "SmallBizHackathonDemo/0.1"})
-        if not resp.ok:
-            return jsonify({"error": "The vendor page did not return readable HTML. Try a different official product page."}), 422
-        if "text/html" not in resp.headers.get("content-type", ""):
-            return jsonify({"error": "This link doesn't appear to serve an HTML page."}), 422
-        soup = BeautifulSoup(resp.text[:300_000], "html.parser")
-        for junk in soup(["script", "style", "noscript", "nav", "footer"]):
-            junk.decompose()
-        title = (soup.title.get_text(" ", strip=True) if soup.title else domain)[:130]
-        meta = soup.find("meta", attrs={"name": "description"})
-        desc = (meta.get("content", "") if meta else "")[:800]
-        headings = " | ".join(h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2"], limit=8))[:1200]
-        summary = (desc or headings or soup.get_text(" ", strip=True)[:1000]).strip()
-        if not summary:
-            return jsonify({"error": "No useful product details found on the page."}), 422
-        try:
-            generated = ai_text(
-                "Extract the page's explicit product purpose and AI features, if present. "
-                "Do not invent pricing, integrations, benefits, or capabilities. "
-                "Summarize in under 90 words. Say when an AI feature is not confirmed.",
-                f"Official URL: {url}\nPage title: {title}\nExtracted text: {summary}\nHeadings: {headings}"
-            )
-        except Exception:
-            generated = None
-        candidate = generated or summary[:400]
-        with db() as con:
-            con.execute("INSERT INTO discovered(url,title,summary,evidence,created_at,status) VALUES (?,?,?,?,?,?)",
-                        (url, title, candidate, summary[:1600], date.today().isoformat(), "Needs review"))
-        return jsonify({"title": title, "summary": candidate, "source": url,
-                        "status": "Needs review", "mode": "AI extraction" if generated else "Page metadata extraction",
-                        "note": "This candidate was extracted from a vendor page but was not independently validated or added to ranked recommendations."})
-    except requests.RequestException:
-        return jsonify({"error": "The site couldn't be reached. Some vendors block automated requests."}), 422
+        page = SafeFetcher(max_redirects=0, respect_robots=False).fetch(url, allowed_domains=ALLOWED_DISCOVERY_DOMAINS)
+    except FetchError as exc:
+        return jsonify({"error": str(exc)}), 422
+    title, desc, headings = page.title[:130], page.description, page.headings
+    summary = (desc or headings or page.text[:1000]).strip()
+    if not summary:
+        return jsonify({"error": "No useful product details found on the page."}), 422
+    try:
+        generated = ai_text(
+            "Extract the page's explicit product purpose and AI features, if present. "
+            "Do not invent pricing, integrations, benefits, or capabilities. "
+            "Summarize in under 90 words. Say when an AI feature is not confirmed.",
+            f"Official URL: {url}\nPage title: {title}\nExtracted text: {summary}\nHeadings: {headings}"
+        )
+    except Exception:
+        generated = None
+    candidate = generated or summary[:400]
+    with db() as con:
+        con.execute("INSERT INTO discovered(url,title,summary,evidence,created_at,status) VALUES (?,?,?,?,?,?)",
+                    (url, title, candidate, summary[:1600], date.today().isoformat(), "Needs review"))
+    return jsonify({"title": title, "summary": candidate, "source": url,
+                    "status": "Needs review", "mode": "AI extraction" if generated else "Page metadata extraction",
+                    "note": "This candidate was extracted from a vendor page but was not independently validated or added to ranked recommendations."})
 
 
 @app.post("/api/reviews/submit")
