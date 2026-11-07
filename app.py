@@ -16,11 +16,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from advisor import assess, audit, blueprint, reviews_for
+from agent.api import bp as agent_bp
 from agent.safe_fetch import FetchError, SafeFetcher
+from agent.service import AgentService
 
 BASE = Path(__file__).resolve().parent
+load_dotenv(BASE / ".env")  # API keys live in the git-ignored .env; real env vars take precedence
 DB_PATH = Path(os.environ.get("DB_PATH", str(BASE / "tools.db")))
 PROBLEMS = {
     "retention": ["retain", "return", "repeat", "loyal", "churn", "come back", "customers aren't returning"],
@@ -284,6 +288,9 @@ def health():
 
 
 init_db()
+app.register_blueprint(agent_bp)
+app.extensions["agent_service"] = AgentService.create(DB_PATH)
+app.extensions["agent_service"].runner.recover()
 
 if __name__ == "__main__":
     app.run(debug=True)
