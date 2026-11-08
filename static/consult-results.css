@@ -83,6 +83,7 @@
 .compare-table tbody th{width:28%;font-weight:750;color:#51627b}
 .compare-table tbody tr:nth-child(even){background:#fafbfd}
 .compare-product{display:grid;gap:8px}.compare-product>div{display:flex;align-items:center;gap:8px}
+.compare-product small{display:block;color:#79879a;font-size:11px;font-weight:500;margin-top:3px}
 .compare-product .product-icon{width:30px;height:30px;border-radius:8px}
 .compare-product .product-icon img{width:22px;height:22px;inset:3px}
 .compare-product .product-initial{font-size:13px}
@@ -97,3 +98,5 @@
 .recovery.has-matches #recovery-description{font-size:12px}
 @media(max-width:800px){#options.options{grid-template-columns:1fr}.results-toolbar{align-items:stretch}.results-actions{width:100%}.results-actions .btn{flex:1}.result-description{min-height:0}}
 @media(max-width:500px){.option.result-card{padding:18px}.product-name{font-size:22px}.result-price strong{font-size:30px}.detail-tabs button{padding:8px 7px}.consultation-status{padding:18px}.results-actions .btn{width:100%}}
+
+.result-price.price-neutral strong{font-size:26px;letter-spacing:-.5px;overflow-wrap:anywhere}
