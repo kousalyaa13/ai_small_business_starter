@@ -247,9 +247,12 @@
       'Let’s find a better fit';
     byId('plan-meta').textContent = 'Budget: ' + (plan.monthly_budget == null ? 'not set' :
       money(plan.monthly_budget) + '/month') + ' · ' +
-      (data.intake?.usage?.editors == null ? 'Confirm editing access' :
-        data.intake.usage.editors + ' editor(s), ' +
-        Math.max(0,(data.intake.usage.seats || 1)-data.intake.usage.editors) + ' viewer(s)');
+      (data.intake?.usage?.editors == null ? 'Confirm editing access' : (() => {
+        const editors = data.intake.usage.editors;
+        const viewers = Math.max(0,(data.intake.usage.seats || 1)-editors);
+        return editors + (editors === 1 ? ' editor' : ' editors') + ', ' +
+          viewers + (viewers === 1 ? ' viewer' : ' viewers');
+      })());
     byId('options').innerHTML = options.map((o,i) => card(o,i,canChoose,approval)).join('');
     byId('compare-view').innerHTML = options.length > 1 ? compareTable(options,canChoose) : '';
     byId('approve-line').hidden = !canChoose || !options.length;
