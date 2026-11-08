@@ -62,17 +62,16 @@
  </div>
 </section>
 <section class="section reveal solution-section" id="approach">
- <div class="container solution-grid">
-    <div class="solution-copy"><span class="eyebrow">HOW BLOOMBOTS WORKS</span><h2>From seed<br>to <em>solution.</em></h2><p>Understand your needs, compare your options, and leave with a plan you control.</p>
-   <div class="process-list"><div><span>01</span><section><h3>Seed · Understand your needs</h3><p>Start with a challenge in your own words. Share your budget and current software when you're ready.</p></section></div><div><span>02</span><section><h3>Sprout · Compare your options</h3><p>Compare candidate tools, price assumptions, integration considerations, and important unknowns.</p></section></div><div><span>03</span><section><h3>Bloom · Build your action plan</h3><p>Understand tradeoffs, try an example, and map the next steps before committing.</p></section></div></div>
-   <a href="/solutions" class="button light-button">Explore all solutions <span aria-hidden="true">↗</span></a>
+ <div class="container growth-journey">
+  <div class="growth-intro"><span class="eyebrow">HOW BLOOMBOTS WORKS</span><h2>A little guidance. <em>A lot of growth.</em></h2><p>Three simple steps to find the right tools for your business.</p></div>
+  <div class="growth-stages" role="group" aria-label="Explore the three BloomBots steps">
+   <button class="growth-stage is-active" type="button" aria-expanded="true" aria-controls="growth-detail" data-growth="0"><span class="growth-art seed-art" aria-hidden="true"><span class="growth-emoji">🌰</span></span><span class="growth-number">01</span><strong>Seed</strong><small>Tell us your challenge</small><span class="growth-hint">Explore step ↗</span></button>
+   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="1"><span class="growth-art sprout-art" aria-hidden="true"><span class="growth-emoji">🌱</span></span><span class="growth-number">02</span><strong>Sprout</strong><small>Explore your options</small><span class="growth-hint">Explore step ↗</span></button>
+   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="2"><span class="growth-art bloom-art" aria-hidden="true"><span class="growth-emoji">🌸</span></span><span class="growth-number">03</span><strong>Bloom</strong><small>Grow with a plan</small><span class="growth-hint">Explore step ↗</span></button>
   </div>
-    <div class="product-demo" aria-label="Example of the BloomBots business decision experience">
-     <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ BloomBots.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>Your next step, made clearer.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div></div></div>
-   <div class="demo-corner">A clearer decision starts here. <span>✳</span></div>
-  </div>
-
-<div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div>
+  <div class="growth-detail" id="growth-detail" role="region" aria-live="polite" aria-label="Selected growth step"><span class="growth-detail-label" id="growth-detail-label">STEP 01 · SEED</span><h3 id="growth-detail-title">Start with what's slowing you down.</h3><p id="growth-detail-copy">Describe your business challenge in your own words. Add your budget and existing tools whenever you're ready.</p></div>
+  <a href="#challenges" class="button light-button growth-cta">Find your starting point <span aria-hidden="true">↗</span></a>
+  <div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div>
  </div>
 </section>
 <section class="section reveal research-section" id="research">
