@@ -31,18 +31,31 @@ class DecompositionTests(unittest.TestCase):
                      "Never put budget, price, seats or volume in constraints", "match on email"]:
             self.assertIn(rule, DECOMPOSE_INSTRUCTIONS)
         self.assertNotIn("under $30/month", DECOMPOSE_INSTRUCTIONS)
+        for rule in ["search_query", "Do not add extras", "including the business type", "main job",
+                     'is "other", not "appointment_booking"']:
+            self.assertIn(rule, DECOMPOSE_INSTRUCTIONS)
+
+    def test_business_type_reaches_the_prompt_and_queries_are_filled(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=30, business_type="plumbing")
+        self.assertIn("Business type: plumbing", intake_prompt(intake, 0))
+        result = Decomposition(summary="s", questions=[], components=[
+            Component(id="c1", capability="crm_contacts", description="Store leads", connects=[], constraints=[],
+                      search_query="  ")])
+        components, _ = clean_decomposition(result, intake)
+        self.assertEqual(components[0].search_query, "Store leads")  # never left empty
 
     def test_constraints_are_capped_and_connects_cleaned(self):
         noisy = Decomposition(summary="s", questions=[], components=[
             Component(id="c1", capability="crm_contacts", description="CRM", connects=["c1", "c9"],
-                      constraints=["a", "b", "c", "d", "e"])])
+                      constraints=["a", "b", "c", "d", "e"], search_query="crm for small business")])
         components, _ = clean_decomposition(noisy, Intake(problem_text=EXAMPLE, monthly_budget=30))
         self.assertEqual(components[0].constraints, ["a", "b", "c"])
         self.assertEqual(components[0].connects, [])
 
     def test_budget_question_is_always_asked_when_missing(self):
         result = Decomposition(summary="s", questions=[], components=[
-            Component(id="c1", capability="crm_contacts", description="CRM", connects=[], constraints=[])])
+            Component(id="c1", capability="crm_contacts", description="CRM", connects=[], constraints=[],
+                      search_query="crm for small business")])
         _, questions = clean_decomposition(result, Intake(problem_text=EXAMPLE))
         self.assertEqual(questions[0].field, "monthly_budget")
 
@@ -78,7 +91,8 @@ class OpenRouterAdapterTests(unittest.TestCase):
         from openai import OpenAI
         seen = {}
         decomposition = {"summary": "Two parts.", "questions": [], "components": [
-            {"id": "c1", "capability": "form_capture", "description": "Contact form", "constraints": [], "connects": []}]}
+            {"id": "c1", "capability": "form_capture", "description": "Contact form", "constraints": [], "connects": [],
+             "search_query": "contact form builder"}]}
 
         def handler(request):
             seen["url"], seen["body"] = str(request.url), json.loads(request.content)
@@ -95,6 +109,9 @@ class OpenRouterAdapterTests(unittest.TestCase):
         self.assertTrue(seen["url"].startswith("https://openrouter.ai/api/v1/chat/completions"))
         self.assertEqual(seen["body"]["response_format"]["type"], "json_schema")
         self.assertEqual(seen["body"]["provider"], {"require_parameters": True})
+        self.assertNotIn("reasoning", seen["body"])  # decomposition keeps the model's default effort
+        OpenRouterModel(client).structured("extract", "instructions", "Page text: x", Decomposition)
+        self.assertEqual(seen["body"]["reasoning"], {"effort": "low"})
         self.assertEqual(result.components[0].capability, "form_capture")
         self.assertEqual((usage.provider, usage.input_tokens, usage.cached_input_tokens, usage.output_tokens),
                          ("openrouter", 120, 100, 30))

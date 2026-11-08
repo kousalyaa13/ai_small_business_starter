@@ -6,6 +6,7 @@ writes go through keyed store methods, and research results are cached per run.
 from __future__ import annotations
 
 import operator
+import os
 import sqlite3
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Callable, TypedDict
@@ -48,6 +49,10 @@ class Deps:
     fetcher: Any
     limits: Limits = field(default_factory=Limits)
     load_catalog: Callable[[], list[dict]] = catalog_mod.load_catalog
+    # Discovered tools older than this are researched again instead of reused.
+    discovered_max_age_days: int = field(default_factory=lambda: int(os.environ.get("AGENT_DISCOVERED_MAX_AGE_DAYS", 30)))
+    # Research again until a part the catalog can't cover has at least this many known tools.
+    min_alternatives: int = field(default_factory=lambda: int(os.environ.get("AGENT_MIN_ALTERNATIVES", 3)))
 
 
 def build_graph(deps: Deps, checkpointer):
@@ -73,7 +78,7 @@ def build_graph(deps: Deps, checkpointer):
         components, questions = clean_decomposition(result, intake)
         if not components:
             components = [Component(id="c1", capability="other", description=intake.problem_text[:200],
-                                    constraints=[], connects=[])]
+                                    constraints=[], connects=[], search_query=intake.problem_text[:80])]
         comps = [c.model_dump() for c in components]
         store.update_snapshot(state["run_id"], summary=result.summary, components=comps)
         return {"summary": result.summary, "components": comps, "questions": [q.model_dump() for q in questions]}
@@ -95,14 +100,21 @@ def build_graph(deps: Deps, checkpointer):
     def match_catalog(state):
         store.update_snapshot(state["run_id"], step="checking_catalog")
         intake, catalog = intake_of(state), deps.load_catalog()
-        candidates, gaps = {}, []
+        discovered = store.discovered_tools(deps.discovered_max_age_days)
+        candidates, gaps, notes = {}, [], []
         for comp in map(Component.model_validate, state["components"]):
-            found = catalog_mod.match(comp, intake, catalog)
+            # Vetted catalog first, plus tools found by earlier research. Parts the catalog
+            # can't cover are researched again whenever fewer than min_alternatives are known.
+            vetted = catalog_mod.match(comp, intake, catalog)
+            known = catalog_mod.match_discovered(comp, discovered, limit=None)
+            found = vetted + [c for c in known if c.tool_id not in {v.tool_id for v in vetted}]
+            if known:
+                notes.append(f"Reused {len(known)} tool(s) found by earlier web research for '{comp.description}'.")
             candidates[comp.id] = [c.model_dump() for c in found]
-            if not found:
+            if not vetted and len(known) < deps.min_alternatives:
                 gaps.append(comp.id)
-        store.update_snapshot(state["run_id"], candidates=candidates, gaps=gaps)
-        return {"candidates": candidates, "gaps": gaps}
+        store.update_snapshot(state["run_id"], candidates=candidates, gaps=gaps, research_notes=notes)
+        return {"candidates": candidates, "gaps": gaps, "research_notes": notes}
 
     def after_match(state):
         return "research_gaps" if state.get("gaps") else "build_options"
@@ -115,9 +127,13 @@ def build_graph(deps: Deps, checkpointer):
         comps = {c["id"]: Component.model_validate(c) for c in state["components"]}
         for cid in state["gaps"]:
             found, comp_notes = researcher.research(comps[cid], intake)
-            candidates[cid] = [c.model_dump() for c in found]
+            # Merge with tools already known for this part; a fresh look replaces the saved copy.
+            fresh = {c.tool_id: c.model_dump() for c in found}
+            kept = [c for c in candidates.get(cid, []) if c["tool_id"] not in fresh]
+            candidates[cid] = [*fresh.values(), *kept]
             notes.extend(comp_notes)
-        store.update_snapshot(state["run_id"], candidates=candidates, research_notes=notes)
+        store.update_snapshot(state["run_id"], candidates=candidates,
+                              research_notes=[*state.get("research_notes", []), *notes])
         return {"candidates": candidates, "research_notes": notes}
 
     def build_options_node(state):
@@ -130,7 +146,7 @@ def build_graph(deps: Deps, checkpointer):
 
     def persist_plan(state):
         intake = intake_of(state)
-        gaps = [c["capability"] for c in state["components"] if not state["candidates"].get(c["id"])]
+        gaps = [c["description"] for c in state["components"] if not state["candidates"].get(c["id"])]
 
         def payload(version):
             return PlanVersion(version=version, requirement_version=state["requirement_version"],
@@ -140,6 +156,14 @@ def build_graph(deps: Deps, checkpointer):
 
         plan = store.persist_plan(state["project_id"], state["run_id"], state["requirement_version"], payload)
         return {"plan_id": plan["id"], "plan_version": plan["version"]}
+
+    def after_persist(state):
+        return "await_approval" if state.get("options") else "no_complete_option"
+
+    def no_complete_option(state):
+        # Nothing to approve: every combination left at least one part without a tool.
+        store.update_snapshot(state["run_id"], step="no_complete_option")
+        return {}
 
     def await_approval(state):
         store.update_snapshot(state["run_id"], step="awaiting_approval")
@@ -159,7 +183,8 @@ def build_graph(deps: Deps, checkpointer):
     for name, fn in [("validate_intake", validate_intake), ("decompose", decompose),
                      ("ask_clarification", ask_clarification), ("match_catalog", match_catalog),
                      ("research_gaps", research_gaps), ("build_options", build_options_node),
-                     ("persist_plan", persist_plan), ("await_approval", await_approval),
+                     ("persist_plan", persist_plan), ("no_complete_option", no_complete_option),
+                     ("await_approval", await_approval),
                      ("record_approval", record_approval)]:
         g.add_node(name, fn)
     g.add_edge(START, "validate_intake")
@@ -169,7 +194,8 @@ def build_graph(deps: Deps, checkpointer):
     g.add_conditional_edges("match_catalog", after_match, ["research_gaps", "build_options"])
     g.add_edge("research_gaps", "build_options")
     g.add_edge("build_options", "persist_plan")
-    g.add_edge("persist_plan", "await_approval")
+    g.add_conditional_edges("persist_plan", after_persist, ["await_approval", "no_complete_option"])
+    g.add_edge("no_complete_option", END)
     g.add_edge("await_approval", "record_approval")
     g.add_edge("record_approval", END)
     return g.compile(checkpointer=checkpointer)
