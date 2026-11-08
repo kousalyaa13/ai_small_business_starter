@@ -35,6 +35,25 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'suggestedProblems', r.data)
         self.assertIn(b'landingContext', r.data)
 
+    def test_industry_cards_prefill_relevant_problems(self):
+        response = self.client.get('/consult?industry=restaurant')
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        expected = {
+            'restaurant': ('restaurant or café', 'reservations, staff schedules'),
+            'retail': ('retail shop or boutique', 'keeping inventory accurate'),
+            'services': ('professional services business', 'collecting new client details'),
+            'hvac': ('home services business', 'schedule technicians'),
+            'landscaping': ('landscaping business', 'coordinate crew schedules'),
+            'other': ('small business', 'repetitive tasks'),
+        }
+        for industry, (business_type, problem_fragment) in expected.items():
+            with self.subTest(industry=industry):
+                self.assertIn(f"{industry}:{{type:'{business_type}'", page)
+                self.assertIn(problem_fragment, page)
+        self.assertIn("if(!challenge||!Object.hasOwn(suggestedProblems,challenge))", page)
+        self.assertIn('example.problem;', page)
+
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})
         self.assertEqual(r.status_code,200)
