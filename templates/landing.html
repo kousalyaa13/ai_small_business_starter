@@ -68,7 +68,7 @@
    <a href="/solutions" class="button light-button">Explore all solutions <span aria-hidden="true">↗</span></a>
   </div>
     <div class="product-demo" aria-label="Example of the BloomBots business decision experience">
-     <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ BloomBots.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>Your next step, made clearer.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div><div class="demo-note">Illustrative example · Not a verified customer outcome</div></div></div>
+     <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ BloomBots.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>Your next step, made clearer.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div></div></div>
    <div class="demo-corner">A clearer decision starts here. <span>✳</span></div>
   </div>
  </div>
@@ -81,7 +81,7 @@
    <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
-  <div class="research-foot"><span>We link original reports, explain survey context, and separate published facts from estimates.</span><a href="/solutions#verification">Our research standard <span aria-hidden="true">↗</span></a></div>
+  <div class="research-foot"><a href="/solutions#verification">Our research standard <span aria-hidden="true">↗</span></a></div>
  </div>
 <div class="research-stories" id="stories"><div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>Hear from people building businesses.</h3></div><p>Independent talks for perspective—not BloomBots testimonials or endorsements.</p></div><div class="story-mini-grid">{% for video in content.videos[:2] %}<a class="story-mini" href="{{ video.url }}" target="_blank" rel="noopener noreferrer"><span class="story-mini-play" aria-hidden="true">▶</span><span><small>{{ video.speaker }}</small><strong>{{ video.title }}</strong><span>Watch the talk ↗</span></span></a>{% endfor %}</div></div></section>
 <section class="section reveal about-section" id="about">
