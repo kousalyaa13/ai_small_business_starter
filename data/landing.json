@@ -1,28 +1,28 @@
 {
   "stats": [
     {
-      "value": "33%",
-      "title": "Worried about AI tool quality",
-      "description": "Among small businesses not using AI, one in three cited concerns about the quality of available tools.",
-      "source_name": "U.S. Chamber · 2025 report, p. 21",
-      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
+      "value": "36.2M",
+      "title": "Small businesses in the U.S.",
+      "description": "99.9% of U.S. businesses are small.",
+      "source_name": "U.S. Small Business Administration",
+      "source_url": "https://advocacy.sba.gov/2026/02/03/frequently-asked-questions-about-small-business-2026/",
+      "year": "2026"
+    },
+    {
+      "value": "58%",
+      "title": "Already using generative AI",
+      "description": "Up from 23% in 2023, according to a U.S. Chamber survey.",
+      "source_name": "U.S. Chamber of Commerce",
+      "source_url": "https://www.uschamber.com/technology/artificial-intelligence/u-s-chambers-latest-empowering-small-business-report-shows-majority-of-businesses-in-all-50-states-are-embracing-ai",
       "year": "2025"
     },
     {
-      "value": "30%",
-      "title": "Concerned about implementation costs",
-      "description": "Among small businesses not using AI, nearly one in three cited the expense of getting started.",
-      "source_name": "U.S. Chamber · 2025 report, p. 21",
-      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
-      "year": "2025"
-    },
-    {
-      "value": "28%",
-      "title": "Concerned about legal and compliance issues",
-      "description": "Among small businesses not using AI, more than one in four reported uncertainty about legal or regulatory risks.",
-      "source_name": "U.S. Chamber · 2025 report, p. 21",
-      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
-      "year": "2025"
+      "value": "73%",
+      "title": "Want more guidance on AI",
+      "description": "Of surveyed Goldman Sachs small-business program participants, 73% said more training and resources would help.",
+      "source_name": "Goldman Sachs 10,000 Small Businesses Voices",
+      "source_url": "https://www.goldmansachs.com/pressroom/press-releases/2026/small-businesses-embrace-ai-but-need-training-and-support-to-fully-harness-it",
+      "year": "2026"
     }
   ],
   "challenges": [
@@ -176,5 +176,27 @@
       "challenge": "marketing",
       "cta": "Explore business growth"
     }
-  ]
+  ],
+  "research_quote": {
+    "quote": "When businesses succeed, communities and economies prosper.",
+    "speaker": "Sasan Goodarzi",
+    "role": "CEO, Intuit",
+    "source_url": "https://investors.intuit.com/_assets/_b41bf7d82b2dbbf7f3f1c5737292af81/intuit/news/2025-04-02_New_Intuit_Small_Business_Growth_Council_Launched__1245.pdf",
+    "year": "2025"
+  },
+  "owner_quote": {
+    "quote": "With the right guidance and training, AI can be transformational for Main Street.",
+    "speaker": "Khari Parker",
+    "role": "Co-founder, Connie's Chicken and Waffles",
+    "source_url": "https://www.goldmansachs.com/pressroom/press-releases/2026/small-businesses-embrace-ai-but-need-training-and-support-to-fully-harness-it",
+    "year": "2026"
+  },
+  "case_study": {
+    "eyebrow": "AI IN A REAL SMALL BUSINESS",
+    "title": "How Andy's Pizza puts AI to work",
+    "description": "The local restaurant group uses AI-assisted tools for kitchen screens, phone orders and staff scheduling—while keeping people at the center of customer service.",
+    "source_name": "Harvard Business School",
+    "source_url": "https://www.hbs.edu/bigs/small-business-adopting-ai",
+    "year": "2026"
+  }
 }
