@@ -12,7 +12,7 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'BloomBot', r.data)
         self.assertIn(b'id="challenge-form"', r.data)
         self.assertIn(b"What's holding back", r.data)
-        self.assertIn(b'/consult?challenge=', r.data)
+        self.assertIn(b'/consult?industry=', r.data)
         self.assertNotIn(b'fake testimonial', r.data.lower())
 
     def test_landing_has_five_intentional_sections(self):
@@ -26,7 +26,7 @@ class AppTests(unittest.TestCase):
         self.assertIn('href="/consult?industry=', page)
         self.assertIn('href="/solutions#', page)
         self.assertIn('source_url', project.landing_content()['stats'][0])
-        self.assertIn('not BloomBots testimonials or endorsements', page)
+        self.assertIn('Independent research and perspectives, not endorsements of BloomBots.', page)
 
     def test_embedded_ted_talks_stay_in_research_container(self):
         page = self.client.get('/').get_data(as_text=True)
@@ -38,7 +38,7 @@ class AppTests(unittest.TestCase):
         self.assertIn('Watch on TED', research)
         self.assertIn('rel="noopener noreferrer"', research)
         self.assertIn('id="trust"', page)
-        self.assertIn('class="container trust-wrap"', page)
+        self.assertIn('class="about-values" id="trust"', page)
 
     def test_compact_sections_share_centered_containers(self):
         page = self.client.get('/').get_data(as_text=True)
@@ -48,8 +48,30 @@ class AppTests(unittest.TestCase):
         self.assertIn('class="toolkit-inline" id="solutions"', approach)
         self.assertNotIn('</div>\n<div class="toolkit-inline"', approach)
         self.assertIn('class="research-stories" id="stories"', research)
-        self.assertNotIn('</div>\n  <div class="research-stories"', research)
+        self.assertIn('class="research-quote"', research)
         self.assertEqual(research.count('<iframe '), 2)
+
+    def test_research_evidence_and_quotes_have_sources(self):
+        page = self.client.get('/').get_data(as_text=True)
+        research = page.split('id="research"', 1)[1].split('id="about"', 1)[0]
+        data = project.landing_content()
+        self.assertEqual([stat['value'] for stat in data['stats']], ['36.2M', '58%', '73%'])
+        for stat in data['stats']:
+            with self.subTest(stat=stat['value']):
+                self.assertIn(stat['value'], research)
+                self.assertIn(stat['source_url'], research)
+                self.assertIn(stat['source_name'], research)
+        self.assertIn('surveyed Goldman Sachs small-business program participants', research)
+        for name in ('research_quote', 'owner_quote'):
+            quote = data[name]
+            self.assertIn(quote['quote'], research)
+            self.assertIn(quote['speaker'], research)
+            self.assertIn(quote['source_url'], research)
+        self.assertIn(data['case_study']['title'], research)
+        self.assertIn(data['case_study']['source_url'], research)
+        self.assertIn('Independent research and perspectives, not endorsements', research)
+        self.assertEqual(research.count('<iframe '), 2)
+        self.assertEqual(page.count('class="section reveal '), 5)
 
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
@@ -99,7 +121,7 @@ class AppTests(unittest.TestCase):
         self.assertIn('id="about"', page)
         self.assertIn('SproutBot', page)
         self.assertIn('sproutbot.svg', page)
-        self.assertIn('early-stage hackathon project', page)
+        self.assertIn('two students who built BloomBots at a hackathon', page)
         self.assertIn('id="challenge-form"', page)
         self.assertIn('href="/consult?industry=', page)
         self.assertIn('source_url', project.landing_content()['stats'][0])
