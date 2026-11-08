@@ -28,6 +28,18 @@ class AppTests(unittest.TestCase):
         self.assertIn('source_url', project.landing_content()['stats'][0])
         self.assertIn('not BloomBots testimonials or endorsements', page)
 
+    def test_embedded_ted_talks_stay_in_research_container(self):
+        page = self.client.get('/').get_data(as_text=True)
+        research = page.split('id="research"', 1)[1].split('id="about"', 1)[0]
+        self.assertIn('class="research-stories"', research)
+        self.assertIn('https://embed.ted.com/talks/', research)
+        self.assertEqual(research.count('<iframe '), 2)
+        self.assertIn('loading="lazy"', research)
+        self.assertIn('Watch on TED', research)
+        self.assertIn('rel="noopener noreferrer"', research)
+        self.assertIn('id="trust"', page)
+        self.assertIn('class="container trust-wrap"', page)
+
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
         self.assertEqual(r.status_code, 200)
