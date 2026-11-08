@@ -154,7 +154,8 @@ def landing_content():
 
 @app.get("/solutions")
 def solutions():
-    # Preserve old bookmarks while keeping the capabilities on the homepage.\n    return redirect("/#solutions", code=302)
+    # Preserve old bookmarks while keeping the capabilities on the homepage.
+    return redirect("/#solutions", code=302)
 
 
 @app.get("/dashboard")

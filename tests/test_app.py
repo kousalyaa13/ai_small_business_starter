@@ -1,4 +1,5 @@
 import io
+import html
 import unittest
 import app as project
 
@@ -44,7 +45,7 @@ class AppTests(unittest.TestCase):
         page = self.client.get('/').get_data(as_text=True)
         approach = page.split('id="approach"', 1)[1].split('id="research"', 1)[0]
         research = page.split('id="research"', 1)[1].split('id="about"', 1)[0]
-        self.assertIn('class="container solution-grid"', approach)
+        self.assertIn('class="container growth-journey"', approach)
         self.assertIn('class="toolkit-inline" id="solutions"', approach)
         self.assertNotIn('</div>\n<div class="toolkit-inline"', approach)
         self.assertIn('class="research-stories" id="stories"', research)
@@ -81,8 +82,8 @@ class AppTests(unittest.TestCase):
         self.assertNotIn('href="/solutions"', page)
         for service in project.landing_content()['services']:
             with self.subTest(service=service['id']):
-                self.assertIn(service['title'], page)
-                self.assertIn(service['description'], page)
+                self.assertIn(html.escape(service['title']), page)
+                self.assertIn(html.escape(service['description']), page)
 
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
