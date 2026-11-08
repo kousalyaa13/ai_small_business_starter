@@ -148,6 +148,29 @@ class Store:
             raise RunActive("This project already has an active run.")
         return run_id
 
+    def revise_project(self, project_id, intake: dict):
+        """Atomically supersede an unapproved plan and start a new versioned run."""
+        run_id, ts = new_id("run"), now_iso()
+        with self.tx() as con:
+            last = con.execute(
+                "SELECT id,status FROM agent_runs WHERE project_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
+                (project_id,)).fetchone()
+            if not last:
+                raise RunActive("No existing consultation run was found.")
+            if last["status"] in ("queued", "running", "waiting_input"):
+                raise RunActive("Please wait until the current consultation finishes before changing assumptions.")
+            if last["status"] == "waiting_approval":
+                con.execute("UPDATE agent_runs SET status='superseded',updated_at=? WHERE id=?",
+                            (ts, last["id"]))
+            version = con.execute(
+                "SELECT COALESCE(MAX(version),0)+1 FROM requirement_versions WHERE project_id=?",
+                (project_id,)).fetchone()[0]
+            con.execute("INSERT INTO requirement_versions VALUES (?,?,?,?)",
+                        (project_id, version, json.dumps(intake), ts))
+            con.execute("INSERT INTO agent_runs(id,project_id,status,step,created_at,updated_at) "
+                        "VALUES (?,?,?,?,?,?)", (run_id, project_id, "queued", "queued", ts, ts))
+        return version, run_id
+
     def get_run(self, run_id):
         with self.connect() as con:
             row = con.execute("SELECT * FROM agent_runs WHERE id=?", (run_id,)).fetchone()
@@ -244,6 +267,11 @@ class Store:
                                (project_id,)).fetchone()
             if plan is None or plan["version"] != plan_version:
                 raise StalePlan("That plan version is no longer current. Reload to see the latest options.")
+            latest_requirements = con.execute(
+                "SELECT MAX(version) FROM requirement_versions WHERE project_id=?",
+                (project_id,)).fetchone()[0]
+            if plan["requirement_version"] != latest_requirements:
+                raise StalePlan("Requirements changed. Wait for the updated recommendation before approving.")
             existing = con.execute("SELECT * FROM approvals WHERE plan_id=?", (plan["id"],)).fetchone()
             if existing:
                 existing = self._approval(existing)
