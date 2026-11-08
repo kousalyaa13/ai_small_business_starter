@@ -1,0 +1,23 @@
+.recovery{border:1px solid #f0d5a8;background:#fffbf4;border-radius:16px;padding:20px;margin:18px 0}
+.recovery-head{display:flex;align-items:flex-start;gap:12px}.recovery-symbol{background:#f9e7c7;color:#975c18;border-radius:12px;min-width:39px;height:39px;display:grid;place-items:center;font-size:20px}
+.recovery h3{font-size:19px;color:#3b2b19}.recovery p{font-size:13px;margin-top:5px}
+.recovery-list{margin:12px 0;padding-left:20px;color:#62523f;font-size:13px}.recovery-list li{margin:6px 0}
+.recovery-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:15px}
+.recovery-control{background:#fff;border:1px solid #eadfcf;border-radius:12px;padding:14px;min-width:0}
+.recovery-control label{font-size:12px;font-weight:800;color:#5d4c3c;display:block;margin-bottom:7px}
+.recovery-control input[type=range]{width:100%;accent-color:#bf7d30;padding:0;min-height:24px}
+.recovery-control input[type=number]{max-width:100%;background:#fff}
+.recovery-control .seat-number{font-size:24px;font-weight:850;color:#85501c}
+.recovery-control small{display:block;font-size:12px;color:#7a6d5e;margin-top:7px}
+.recovery-table{margin-top:15px;display:grid;gap:8px}
+.recovery-row{background:white;border:1px solid #e9dfd2;border-radius:12px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:5px 12px}
+.recovery-row b{font-size:13px}.recovery-row .price{font-size:17px;font-weight:850;color:#253248;text-align:right}
+.recovery-row .price.ok{color:#087a5b}.recovery-row .price.over{color:#a65c25}
+.recovery-row small{color:#758092;font-size:11px}.recovery-row .delta{font-size:11px;font-weight:800;text-align:right}
+.recovery-row .delta.ok{color:#087a5b}.recovery-row .delta.over{color:#9d581b}
+.recovery-row a{font-size:11px;font-weight:700}
+.recovery-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.recovery-actions .btn{background:#a96821}.recovery-actions .btn.light{background:white;color:#87561e}
+.recovery-refine{margin-top:13px}.recovery-refine textarea{min-height:74px}
+.recovery .err{margin-top:12px}.option.blocked{opacity:.78}.option.blocked .total{font-size:22px}
+@media(max-width:760px){.recovery-grid{grid-template-columns:1fr}.recovery-row{grid-template-columns:1fr auto}.recovery-actions .btn{width:100%}}
