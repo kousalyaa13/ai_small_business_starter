@@ -41,6 +41,8 @@
     const noneFound = !usable;
     panel.hidden = !plan || !recovery || !!approved || (usable && !globalThis.bloomRecoveryOpen);
     panel.classList.toggle('has-matches', usable);
+    const fitCard = $('fit-card');
+    if (fitCard) fitCard.hidden = panel.hidden;
     if (panel.hidden) return;
     $('options').hidden = noneFound && !(data?.components || []).length;
     $('approve-line').hidden = noneFound || data.run?.status !== 'waiting_approval';
