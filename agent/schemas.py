@@ -19,6 +19,7 @@ class Intake(BaseModel):
 
     problem_text: str = Field(min_length=10, max_length=2000)
     business_name: str = Field("", max_length=80)
+    business_type: str = Field("", max_length=80)  # e.g. "plumbing", "hair salon"; used to judge industry fit
     existing_software: list[str] = Field(default_factory=list, max_length=20)
     monthly_budget: float | None = Field(None, ge=0, le=100_000)
     usage: Usage = Field(default_factory=Usage)
@@ -44,6 +45,7 @@ class Component(BaseModel):
     description: str
     constraints: list[str]
     connects: list[str]  # ids of components whose data this component moves
+    search_query: str  # what a business owner would type into a search engine to find tools for this
 
 
 class Decomposition(BaseModel):
@@ -60,14 +62,31 @@ class ExtractedPlan(BaseModel):
     price_quote: str  # verbatim text from the page that states the price
 
 
+SetupComplexity = Literal["no-code", "low-code", "developer", "unknown"]
+
+
 class ExtractedTool(BaseModel):
     is_vendor_product_page: bool
+    fits_need: bool  # the product's main purpose fulfils the component being researched
+    small_business_fit: bool  # sold to small businesses, not enterprise-only or another industry
+    audience: str  # who the page says the product is for, in a few words
+    setup_complexity: SetupComplexity
     name: str
     capabilities: list[Capability]
     description_quote: str
     plans: list[ExtractedPlan]
     api_available: bool | None
     api_quote: str
+
+
+class ToolMention(BaseModel):
+    name: str
+    best_for: str  # the article's short note on what the tool is best for
+    url: str | None  # the tool's own website if the article links or names it, else null
+
+
+class ArticleTools(BaseModel):
+    tools: list[ToolMention]
 
 
 # ---- Application records.
@@ -103,6 +122,10 @@ class Candidate(BaseModel):
     evidence: list[Evidence] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     deployable_by_platform: bool = False
+    audience: str = ""
+    setup_complexity: str = "unknown"
+    best_for: str = ""
+    mentions: int = 0  # how many comparison articles mentioned this tool
 
 
 class Assignment(BaseModel):
@@ -117,6 +140,9 @@ class Assignment(BaseModel):
     monthly_cost: float | None = None
     cost_basis: str = ""
     source_url: str = ""
+    alternatives: list[dict] = Field(default_factory=list)  # other tools that also fit this part
+    setup_complexity: str = "unknown"
+    best_for: str = ""
 
 
 class Option(BaseModel):

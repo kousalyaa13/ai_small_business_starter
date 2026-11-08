@@ -43,17 +43,33 @@ class CatalogAndOptionsTests(unittest.TestCase):
 
     def test_catalog_match_and_gaps(self):
         intake = Intake(problem_text=EXAMPLE)
-        crm = catalog.match(Component(id="c1", capability="crm_contacts", description="", constraints=[], connects=[]),
+        crm = catalog.match(Component(id="c1", capability="crm_contacts", description="", constraints=[], connects=[], search_query=""),
                             intake, self.catalog)
         self.assertEqual(crm[0].name, "HubSpot")
         self.assertTrue(all(c.vetted and c.source == "catalog" for c in crm))
-        other = catalog.match(Component(id="c2", capability="other", description="", constraints=[], connects=[]),
+        other = catalog.match(Component(id="c2", capability="other", description="", constraints=[], connects=[], search_query=""),
                               intake, self.catalog)
         self.assertEqual(other, [])
 
+    def test_discovered_tools_match_by_capability_or_wording(self):
+        tool = {"tool_id": "web:calldesk.example", "name": "CallDesk", "site": "https://calldesk.example/",
+                "description": "", "capabilities": ["support_chat"], "plans": [{"name": "Solo", "monthly_price": 29}],
+                "evidence": [], "pricing_source_url": "", "last_checked": "2026-11-07T00:00:00+00:00",
+                "needs": ["Answer incoming phone calls and capture caller details"]}
+        same_need = Component(id="c1", capability="other", description="Answer phone calls and capture leads",
+                              constraints=[], connects=[], search_query="")
+        other_need = Component(id="c2", capability="other", description="Send invoices after each job",
+                               constraints=[], connects=[], search_query="")
+        tagged = Component(id="c3", capability="support_chat", description="Chat", constraints=[], connects=[], search_query="")
+        found = catalog.match_discovered(same_need, [tool])
+        self.assertEqual([(c.name, c.source, c.vetted) for c in found], [("CallDesk", "web", False)])
+        self.assertIn("earlier web research", found[0].notes[0])
+        self.assertEqual(catalog.match_discovered(other_need, [tool]), [])
+        self.assertEqual(len(catalog.match_discovered(tagged, [tool])), 1)
+
     def test_owned_software_ranks_first(self):
         intake = Intake(problem_text=EXAMPLE, existing_software=["Wix"])
-        forms = catalog.match(Component(id="c1", capability="form_capture", description="", constraints=[], connects=[]),
+        forms = catalog.match(Component(id="c1", capability="form_capture", description="", constraints=[], connects=[], search_query=""),
                               intake, self.catalog)
         self.assertEqual(forms[0].tool_id, "wix")
         self.assertTrue(forms[0].owned)
@@ -70,6 +86,42 @@ class CatalogAndOptionsTests(unittest.TestCase):
         alternative = [o for o in options if o.title.startswith("Alternative")][0]
         self.assertNotIn("hubspot", [a.tool_id for a in alternative.assignments])
         self.assertFalse(any(o.deployable_by_platform for o in options))
+
+    def test_options_with_an_uncovered_part_are_not_offered(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=30)
+        crm = Component(id="c1", capability="crm_contacts", description="CRM", constraints=[], connects=[], search_query="")
+        calls = Component(id="c2", capability="other", description="Answer phone calls", constraints=[], connects=[], search_query="")
+        web_tool = catalog.Candidate(tool_id="web:calldesk.example", name="CallDesk", source="web", vetted=False,
+                                     capabilities=["other"], plans=[Plan(name="Solo", monthly_price=29)])
+        cands = {"c1": catalog.match(crm, intake, self.catalog), "c2": [web_tool]}
+        options = build_options([crm, calls], cands, intake)
+        self.assertTrue(options)
+        for option in options:  # "Vetted tools only" would leave the call part blank, so it is dropped
+            self.assertNotIn("none", [a.source for a in option.assignments])
+            self.assertNotEqual(option.title, "Vetted tools only")
+        self.assertEqual(build_options([crm, calls], {"c1": cands["c1"], "c2": []}, intake), [])
+
+    def test_each_part_lists_the_other_tools_that_fit(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=200))
+        comps = self.decompose(EXAMPLE, monthly_budget=30).components
+        cands = {c.id: catalog.match(c, intake, self.catalog) for c in comps}
+        crm = [a for a in build_options(comps, cands, intake)[0].assignments if a.capability == "crm_contacts"][0]
+        self.assertEqual(crm.tool_name, "HubSpot")
+        self.assertIn("Jobber", [alt["name"] for alt in crm.alternatives])
+        self.assertNotIn("HubSpot", [alt["name"] for alt in crm.alternatives])
+        jobber = [alt for alt in crm.alternatives if alt["name"] == "Jobber"][0]
+        self.assertEqual((jobber["plan_name"], jobber["monthly_cost"], jobber["vetted"]), ("Core", 49.0, True))
+
+    def test_developer_tools_are_alternatives_not_the_pick(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=100)
+        calls = Component(id="c1", capability="other", description="Answer phone calls", constraints=[], connects=[], search_query="")
+        dev = catalog.Candidate(tool_id="web:vapi.example", name="Vapi", source="web", vetted=False, capabilities=[],
+                                setup_complexity="developer", plans=[Plan(name="Pay as you go", monthly_price=5)])
+        easy = catalog.Candidate(tool_id="web:goodcall.example", name="Goodcall", source="web", vetted=False,
+                                 capabilities=[], setup_complexity="no-code", plans=[Plan(name="Starter", monthly_price=59)])
+        best = build_options([calls], {"c1": [dev, easy]}, intake)[0].assignments[0]
+        self.assertEqual(best.tool_name, "Goodcall")
+        self.assertEqual([(a["name"], a["setup_complexity"]) for a in best.alternatives], [("Vapi", "developer")])
 
     def test_owned_tool_wins_cost_ties(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, existing_software=["Wix"])

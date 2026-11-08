@@ -48,7 +48,7 @@ Describe a business problem in plain English. The agent:
 
 1. **Breaks it into components.** Each component gets one capability tag from a fixed list (`agent/capabilities.py`). Examples: `form_capture`, `crm_contacts`, `workflow_automation`.
 2. **Checks the in-house catalog first.** `data/tools.json` lists vetted tools with capabilities and plan prices, each recorded with its source URL and the date checked.
-3. **Searches the web only for gaps.** It uses TinyFish (or Brave) to search, then reads vendor pages through TinyFish's browser-based fetch or an SSRF-guarded direct fetcher. A model extracts facts, and code keeps only those whose quoted evidence appears on the page. Web finds are always labelled *not vetted* and go to the `discovered` review queue.
+3. **Searches the web for gaps.** The breakdown step writes a plain search query per part (e.g. "AI receptionist for plumbers"). Research reads up to 4 independent comparison articles to collect the tools they recommend (a vendor's mention of itself doesn't count), checks each tool's own site for price, audience and setup difficulty, and drops tools aimed at enterprises or other industries. It uses TinyFish (or Brave) to search, then reads vendor pages through TinyFish's browser-based fetch or an SSRF-guarded direct fetcher. A model extracts facts, and code keeps only those whose quoted evidence appears on the page. Web finds are always labelled *not vetted* and are saved to the `discovered_tools` table. A later request for the same need reuses them instead of searching again, and rediscovering a tool refreshes its prices. Needs outside the fixed capability list (such as answering phone calls) are matched by their wording. Entries older than 30 days are researched again.
 4. **Builds two or three options.** Monthly costs are calculated in code from the plans and your usage. A tool covering several parts is counted once, and unknown prices are never guessed.
 5. **Pauses for your approval.** The LangGraph run is checkpointed in SQLite, so it survives restarts. Approvals are idempotent: repeating a request returns the same record.
 
@@ -62,6 +62,9 @@ Put keys in a `.env` file in the project folder (copy `.env.example`). It is git
 |---|---|
 | `OPENAI_API_KEY` | Real decomposition and extraction. Without it, a deterministic keyword stub is used. |
 | `OPENROUTER_API_KEY` | Used when `OPENAI_API_KEY` is not set. Defaults: `openai/gpt-5-mini` for decomposition, `openai/gpt-5-nano` for extraction. `OPENROUTER_MODEL` sets one model for both. |
+| `AGENT_REASONING_EXTRACT`, `AGENT_REASONING_DECOMPOSE` | Reasoning effort per task (`none`, `minimal`, `low`, `medium`, `high`). Extraction defaults to `low`, which keeps vendor-page reading at a few seconds per page. |
+| `AGENT_RESEARCH_CANDIDATES`, `AGENT_MIN_ALTERNATIVES` | Vendor sites checked per uncovered part (default 8), and how many known tools a part needs before research is skipped (default 3). |
+| `AGENT_DISCOVERED_MAX_AGE_DAYS` | How long a web-discovered tool is reused before it is researched again (default 30). |
 | `AGENT_PROVIDER` | Force `openai`, `openrouter` or `stub`, regardless of which keys are set. |
 | `OPENAI_MODEL`, `AGENT_MODEL_DECOMPOSE`, `AGENT_MODEL_EXTRACT` | Model per task (the last two default to `OPENAI_MODEL`). |
 | `TINYFISH_API_KEY` | Web research via TinyFish: its Search API finds vendors, and its Fetch API reads pages in a real browser. Used before Brave when both are set. |

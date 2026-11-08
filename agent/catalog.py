@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from .schemas import Candidate, Component, Intake, Plan
@@ -44,3 +45,63 @@ def match(component: Component, intake: Intake, catalog: list[dict]) -> list[Can
         return (not c.owned, not integrates, cheapest, c.name)
 
     return sorted(matches, key=rank)
+
+
+# ---- Tools discovered by earlier web research (unvetted, reused until they go stale)
+
+STOPWORDS = {
+    "a", "an", "and", "any", "are", "as", "at", "be", "by", "for", "from", "in", "into", "is", "it", "its",
+    "of", "on", "or", "our", "so", "that", "the", "their", "them", "they", "to", "via", "we", "when",
+    "with", "without", "you", "your", "each", "every", "new", "automatically", "automated", "tool", "software",
+}
+
+
+def need_words(text: str) -> set[str]:
+    words = set()
+    for raw in re.findall(r"[a-z0-9]+", (text or "").lower()):
+        if raw in STOPWORDS or len(raw) < 3:
+            continue
+        for suffix in ("ing", "es", "s"):
+            if raw.endswith(suffix) and len(raw) - len(suffix) >= 3:
+                raw = raw[: -len(suffix)]
+                break
+        words.add(raw)
+    return words
+
+
+def needs_match(a: str, b: str) -> bool:
+    """Same need in different words: at least two shared content words covering 60% of the shorter."""
+    wa, wb = need_words(a), need_words(b)
+    shared = wa & wb
+    return len(shared) >= 2 and len(shared) / max(1, min(len(wa), len(wb))) >= 0.6
+
+
+def match_discovered(component: Component, discovered: list[dict], limit=3) -> list[Candidate]:
+    """Reuse earlier web finds. Tagged capabilities match directly; 'other' needs match by wording."""
+    from .research import looks_like_article  # local import: research imports catalog-free helpers only
+    matches = []
+    for tool in discovered:
+        if looks_like_article(tool["site"]):
+            continue  # saved from a blog post before articles were filtered
+        if component.capability == "other":
+            fits = any(needs_match(component.description, need) for need in tool["needs"])
+        else:
+            fits = component.capability in tool["capabilities"]
+        if not fits:
+            continue
+        checked = tool["last_checked"][:10]
+        matches.append(Candidate(
+            tool_id=tool["tool_id"], name=tool["name"], source="web", vetted=False,
+            capabilities=tool["capabilities"], site=tool["site"], description=tool.get("description") or "",
+            plans=[Plan(**p) for p in tool["plans"]], pricing_source_url=tool.get("pricing_source_url") or "",
+            pricing_checked_at=checked, evidence=tool["evidence"], audience=tool.get("audience") or "",
+            setup_complexity=tool.get("setup_complexity") or "unknown", best_for=tool.get("best_for") or "",
+            mentions=tool.get("mentions") or 0,
+            notes=[f"Found by earlier web research (last checked {checked}) — not yet vetted by our team."]))
+
+    def rank(c: Candidate):
+        prices = [p.monthly_price for p in c.plans if p.monthly_price is not None]
+        return (min(prices) if prices else float("inf"), c.name)
+
+    ranked = sorted(matches, key=rank)
+    return ranked if limit is None else ranked[:limit]

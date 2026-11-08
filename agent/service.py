@@ -102,7 +102,7 @@ class AgentService:
                 match = "catalog" if cands[0]["source"] == "catalog" else "web"
             components.append({**comp, "match": match,
                                "candidates": [{"name": c["name"], "source": c["source"], "vetted": c["vetted"],
-                                               "site": c["site"]} for c in (cands or [])[:3]]})
+                                               "site": c["site"]} for c in (cands or [])]})
         usage = Meter(self.store, run["id"], project_id, Limits.from_env()).totals() if run else {}
         return {
             "project": {"id": project["id"], "created_at": project["created_at"]},

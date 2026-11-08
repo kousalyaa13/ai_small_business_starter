@@ -27,6 +27,7 @@ input,textarea{width:100%;border:1px solid #d8dfe9;background:white;border-radiu
 details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:750;color:#425371}details ul{padding-left:18px;margin:6px 0}
 .notes{font-size:12px;color:#6b778a;background:#f4f7fb;border-radius:10px;padding:10px 12px;margin-top:12px}.notes li{margin:2px 0}
 .approved{border-top:5px solid var(--teal);background:#f3fbf8}
+.alts{margin-top:6px;font-size:12px}.alts summary{font-weight:700;color:var(--blue)}.alts ul{margin:6px 0 2px;padding-left:18px}.alts li{margin:3px 0}
 @media(max-width:760px){.fields{grid-template-columns:1fr}.submit-line{flex-direction:column;align-items:stretch}}
 </style>
 </head>
@@ -43,6 +44,7 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
   <form id="intake-form" class="card" style="margin-top:22px" autocomplete="off">
    <div class="fields">
     <label class="field wide">Your problem<textarea name="problem_text" required minlength="10" maxlength="2000">Whenever someone fills out our contact form, add them to our CRM without creating duplicate contacts. Keep additional software costs under $30 per month.</textarea></label>
+    <label class="field">Type of business<input name="business_type" maxlength="80" placeholder="e.g. plumbing, hair salon"></label>
     <label class="field">Business name<input name="business_name" maxlength="80" placeholder="Optional"></label>
     <label class="field">Software you already use<input name="existing_software" placeholder="e.g. Wix, Google Sheets"></label>
     <label class="field">Monthly budget for new software ($)<input name="monthly_budget" type="number" min="0" step="1" placeholder="e.g. 30"></label>
@@ -69,7 +71,7 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
 
   <div class="card" id="plan-card" hidden>
    <span class="eyebrow" style="color:var(--teal)">Recommended options</span>
-   <h2>Pick the option you want</h2>
+   <h2 id="plan-title">Pick the option you want</h2>
    <p class="caption" id="plan-meta" style="margin-top:6px"></p>
    <div class="options" id="options"></div>
    <div class="submit-line" id="approve-line" style="justify-content:flex-start;gap:12px">
@@ -92,12 +94,13 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const safeUrl=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:'#'}catch{return '#'}};
 const money=n=>n==null?'unknown':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
 const STEPS=[['understanding','Understanding'],['clarifying','Questions'],['checking_catalog','Checking our catalog'],['researching','Researching the web'],['building_options','Building options'],['awaiting_approval','Your approval'],['approved','Approved']];
+const NO_OPTION='no_complete_option';
 let projectId=new URLSearchParams(location.search).get('project'),timer=null,data=null,approveKey=null;
 
 function num(v){return v===''||v==null?null:Number(v)}
 $('intake-form').addEventListener('submit',async e=>{
  e.preventDefault();const f=new FormData(e.currentTarget),btn=$('start-btn');btn.disabled=true;$('intake-error').hidden=true;
- const body={problem_text:f.get('problem_text'),business_name:f.get('business_name'),
+ const body={problem_text:f.get('problem_text'),business_name:f.get('business_name'),business_type:f.get('business_type'),
   existing_software:String(f.get('existing_software')||'').split(',').map(s=>s.trim()).filter(Boolean),
   monthly_budget:num(f.get('monthly_budget')),
   usage:{seats:num(f.get('seats'))||1,monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
@@ -121,7 +124,7 @@ function render(){
  $('summary').textContent=data.summary||'Understanding your problem…';
  const idx=STEPS.findIndex(s=>s[0]===step);
  $('steps').innerHTML=STEPS.map((s,i)=>`<span class="step ${i<idx||run.status==='completed'?'done':i===idx?'now':''}">${esc(s[1])}</span>`).join('');
- $('run-status').textContent={queued:'Starting…',running:'Working on it…',waiting_input:'We need a little more information.',waiting_approval:'Your options are ready.',completed:'Plan approved.',failed:''}[run.status]||'';
+ $('run-status').textContent=(step===NO_OPTION?'We could not find tools for every part of this problem.':{queued:'Starting…',running:'Working on it…',waiting_input:'We need a little more information.',waiting_approval:'Your options are ready.',completed:'Plan approved.',failed:''}[run.status])||'';
  $('run-error').hidden=run.status!=='failed';$('run-error').textContent=run.error||'';
  renderQuestions();renderComponents();renderPlan();
 }
@@ -146,6 +149,15 @@ function renderComponents(){
 const SRC={catalog:['b-catalog','Reviewed'],web:['b-web','Not vetted'],owned:['b-owned','You already use'],native:['b-native','Built in'],none:['b-none','Gap']};
 function renderPlan(){
  const plan=data.plan,approval=data.approval;$('plan-card').hidden=!plan;if(!plan)return;
+ if(!plan.options.length){
+  $('plan-title').textContent='No complete option';$('plan-meta').textContent='';$('approve-line').hidden=true;$('approved').hidden=true;
+  $('options').innerHTML=`<div class="option"><h3>No complete set of tools yet</h3>
+   <p class="caption">We only show options where every part has a tool. We couldn't find one for:</p>
+   <ul>${(plan.gaps||[]).map(g=>'<li>'+esc(g)+'</li>').join('')}</ul>
+   <p class="caption">Try describing that part differently, or check back later as our research grows.</p></div>`;
+  return;
+ }
+ $('plan-title').textContent='Pick the option you want';
  $('plan-meta').textContent=`Plan version ${plan.version} · Budget ${plan.monthly_budget==null?'not set':money(plan.monthly_budget)+'/month'} · Prices checked from vendor sites; confirm before buying.`;
  const canApprove=data.run?.status==='waiting_approval'&&!approval;
  $('approve-line').hidden=!canApprove;
@@ -155,7 +167,7 @@ function renderPlan(){
   return `<div class="option ${approval?.option_id===o.id?'chosen':''}"><div><span class="eyebrow" style="margin:0">${esc(o.title)}</span><p class="caption">${esc(o.summary)}</p></div>
   <div class="total ${cls}">${money(o.monthly_total)}<small> /month${o.total_is_complete?'':' + unknown'} · ${esc(label)}</small></div>
   <div class="alist">${o.assignments.map(a=>{const s=SRC[a.source]||SRC.none;return `<div class="arow"><span class="cost">${a.monthly_cost==null?'price unknown':money(a.monthly_cost)}</span>
-   <b>${esc(a.tool_name)}</b>${a.plan_name?' · '+esc(a.plan_name):''} <span class="badge ${s[0]}">${esc(s[1])}</span><br><small class="caption">${esc(a.capability.replaceAll('_',' '))}${a.cost_basis?' — '+esc(a.cost_basis):''}</small></div>`}).join('')}</div>
+   <b>${esc(a.tool_name)}</b>${a.plan_name?' · '+esc(a.plan_name):''} <span class="badge ${s[0]}">${esc(s[1])}</span>${setupTag(a)}${bestFor(a)}<br><small class="caption">${esc(a.capability.replaceAll('_',' '))}${a.cost_basis?' — '+esc(a.cost_basis):''}</small>${altList(a)}</div>`}).join('')}</div>
   <details><summary>Assumptions & setup</summary><ul>${o.assumptions.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul><b>Setup</b><ul>${o.setup_requirements.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></details>
   <details><summary>Sources (${o.sources.length})</summary><ul>${o.sources.map(u=>`<li><a href="${safeUrl(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a></li>`).join('')}</ul></details>
   ${canApprove?`<button class="btn blue" data-approve="${esc(o.id)}" type="button">Approve this option</button>`:''}</div>`}).join('');
@@ -164,6 +176,15 @@ function renderPlan(){
  if(approval){const o=plan.options.find(x=>x.id===approval.option_id);
   $('approved-title').textContent='You approved: '+(o?o.title:approval.option_id);
   $('approved-detail').textContent=`Plan version ${approval.plan_version} · Recurring cost ${money(approval.recurring_cost.monthly_total)}/month${approval.recurring_cost.total_is_complete?'':' plus unknown prices'} · Setup budget ${money(approval.max_build_budget)} · Approved ${new Date(approval.created_at).toLocaleString()}`;}
+}
+
+const SETUP={'no-code':'No-code','low-code':'Low-code',developer:'Developer setup'};
+function setupTag(x){const t=SETUP[x.setup_complexity];return t?` <span class="badge ${x.setup_complexity==='developer'?'b-none':'b-pending'}">${esc(t)}</span>`:''}
+function bestFor(x){return x.best_for?` <span class="caption">· ${esc(x.best_for)}</span>`:''}
+function altList(a){
+ const alts=a.alternatives||[];if(!alts.length)return '';
+ return `<details class="alts"><summary>${alts.length} other tool${alts.length>1?'s':''} fit this part</summary><ul>${alts.map(x=>{const s=SRC[x.source]||SRC.web;
+  return `<li><a href="${safeUrl(x.site)}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a> <span class="badge ${s[0]}">${esc(s[1])}</span>${setupTag(x)} — ${x.monthly_cost==null?'price not listed':money(x.monthly_cost)+'/month'}${x.plan_name&&x.monthly_cost!=null?' ('+esc(x.plan_name)+')':''}${bestFor(x)}</li>`}).join('')}</ul></details>`;
 }
 
 async function approve(optionId,version){
