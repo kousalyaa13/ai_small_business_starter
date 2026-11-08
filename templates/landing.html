@@ -71,8 +71,10 @@
      <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ BloomBots.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>Your next step, made clearer.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div></div></div>
    <div class="demo-corner">A clearer decision starts here. <span>✳</span></div>
   </div>
+
+<div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div>
  </div>
-<div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div></section>
+</section>
 <section class="section reveal research-section" id="research">
  <div class="container">
   <div class="section-heading-row"><div><span class="eyebrow">GROWTH STARTS WITH UNDERSTANDING</span><h2>Growth starts with <em>understanding.</em></h2></div><p>Real research helps us ask better questions before suggesting technology.</p></div>
@@ -82,7 +84,6 @@
   {% endfor %}
   </div>
   <div class="research-foot"><a href="/solutions#verification">Our research standard <span aria-hidden="true">↗</span></a></div>
- </div>
   <div class="research-stories" id="stories">
    <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>Hear from people building businesses.</h3></div><p>Independent talks for perspective—not BloomBots testimonials or endorsements.</p></div>
    <div class="story-video-grid">
