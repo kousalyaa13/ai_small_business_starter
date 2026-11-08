@@ -4,7 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, render_template, request
 from pydantic import ValidationError
 
-from .schemas import Answers, ApprovalRequest, Intake
+from .schemas import Answers, ApprovalRequest, Intake, RevisionRequest
 from .service import Conflict, NotFound
 
 bp = Blueprint("agent", __name__)
@@ -58,6 +58,18 @@ def answer(project_id):
         return _validation_error(exc)
     service().answer(project_id, body)
     return jsonify({"status": "accepted"}), 202
+
+
+@bp.post("/api/projects/<project_id>/revise")
+def revise(project_id):
+    try:
+        body = RevisionRequest.model_validate(request.get_json(silent=True) or {})
+        version, run_id = service().revise(project_id, body)
+    except ValidationError as exc:
+        return _validation_error(exc)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"status": "accepted", "requirement_version": version, "run_id": run_id}), 202
 
 
 @bp.post("/api/projects/<project_id>/approve")
