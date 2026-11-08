@@ -42,6 +42,10 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
 input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline-color:#9d64c5}
 </style>
 <style>
+/* Hide internal partial-price suggestions; refinement should focus on user controls. */
+#recovery-prices{display:none!important}
+</style>
+<style>
 /* Friendly progress indicator: visible only while the consultation is running. */
 .bloom-loading{margin:18px 0 6px;padding:14px 18px 10px;border:1px solid #eadcf4;border-radius:16px;background:linear-gradient(110deg,#fffaff,#f5edff);overflow:hidden}
 .bloom-loading-track{height:64px;position:relative;border-bottom:2px dashed #d9c1ed}
@@ -96,33 +100,6 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
    <ul class="notes" id="notes" hidden></ul>
   </div>
 
-  <section class="card" id="fit-card" hidden aria-label="Find a better fit">
-   <span class="eyebrow">Your budget &amp; team</span>
-   <h2>Find your best fit</h2>
-   <p class="caption" style="margin:6px 0 16px">Explore budget and team-size changes separately from choosing your tools.</p>
-   <div id="recovery-panel" class="recovery" hidden>
-      <div class="recovery-head"><div class="recovery-symbol">✦</div><div><h3 id="recovery-title">Let's find a better fit</h3>
-      <p id="recovery-description">We'll show exactly which changes could help, without guessing prices.</p></div></div>
-      <ul class="recovery-list" id="recovery-suggestions"></ul>
-      <details id="recovery-details"><summary>What could I change? · Compare budget and access</summary>
-       <div class="recovery-grid">
-        <div class="recovery-control"><label for="editor-slider">People who need to edit</label>
-         <div class="seat-number" id="editor-count"></div><input id="editor-slider" type="range" min="1" max="5" value="3">
-         <small id="viewer-count"></small></div>
-        <div class="recovery-control"><label for="recovery-budget">Monthly software budget ($)</label>
-         <input id="recovery-budget" type="number" min="0" max="100000" step="1" value="75">
-         <small>We compare actual paid editors, free viewers and billing terms.</small></div>
-       </div>
-       <div id="recovery-prices" class="recovery-table" aria-live="polite"></div>
-       <div class="recovery-refine"><label class="field" for="recovery-problem">Clarify your business task (optional)
-        <textarea id="recovery-problem" maxlength="2000" minlength="10"></textarea></label></div>
-       <div class="recovery-actions"><button class="btn blue" type="button" id="recovery-apply">Update & find better options →</button>
-        <span class="caption">Keeps your project history; nothing is purchased.</span></div>
-       <div class="err" id="recovery-error" role="alert" hidden></div>
-      </details>
-     </div>
-  </section>
-
   <div class="card" id="plan-card" hidden>
    <div class="results-toolbar">
     <div><span class="eyebrow" style="color:var(--teal)">Recommended tools</span>
@@ -137,6 +114,33 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
      </details>
    <div id="approve-error" class="err" role="alert" hidden></div>
   </div>
+
+  <section class="card" id="fit-card" hidden aria-label="Find a better fit">
+   <span class="eyebrow">REFINE YOUR SEARCH</span>
+   <h2>Still not satisfied? Let’s find a better fit.</h2>
+   <p class="caption" style="margin:6px 0 16px">Adjust your budget, team access, or business needs to search for more relevant options.</p>
+   <div id="recovery-panel" class="recovery" hidden>
+      <div class="recovery-head"><div class="recovery-symbol">✦</div><div><h3 id="recovery-title">Let's find a better fit</h3>
+      <p id="recovery-description">We'll show exactly which changes could help, without guessing prices.</p></div></div>
+      <ul class="recovery-list" id="recovery-suggestions"></ul>
+      <details id="recovery-details"><summary>Adjust your search</summary>
+       <div class="recovery-grid">
+        <div class="recovery-control"><label for="editor-slider">People who need to edit</label>
+         <div class="seat-number" id="editor-count"></div><input id="editor-slider" type="range" min="1" max="5" value="3">
+         <small id="viewer-count"></small></div>
+        <div class="recovery-control"><label for="recovery-budget">Monthly software budget ($)</label>
+         <input id="recovery-budget" type="number" min="0" max="100000" step="1" value="75">
+         <small>We compare actual paid editors, free viewers and billing terms.</small></div>
+       </div>
+       <div id="recovery-prices" class="recovery-table" aria-live="polite" hidden></div>
+       <div class="recovery-refine"><label class="field" for="recovery-problem">Clarify your business task (optional)
+        <textarea id="recovery-problem" maxlength="2000" minlength="10"></textarea></label></div>
+       <div class="recovery-actions"><button class="btn blue" type="button" id="recovery-apply">Update & find better options →</button>
+        <span class="caption">Keeps your project history; nothing is purchased.</span></div>
+       <div class="err" id="recovery-error" role="alert" hidden></div>
+      </details>
+     </div>
+  </section>
 
   <div class="card approved" id="approved" hidden>
    <span class="eyebrow" style="color:var(--teal)">Saved decision</span>
