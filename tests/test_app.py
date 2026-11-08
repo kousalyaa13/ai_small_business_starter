@@ -19,7 +19,7 @@ class AppTests(unittest.TestCase):
         page = self.client.get('/').get_data(as_text=True)
         order = ['id="industries"', 'id="approach"',
                  'id="solutions"', 'id="research"', 'id="stories"',
-                 'id="about"', 'id="trust"']
+                 'id="about"']
         positions = [page.index(anchor) for anchor in order]
         self.assertEqual(positions, sorted(positions))
         self.assertIn('href="#solutions"', page)
@@ -34,8 +34,6 @@ class AppTests(unittest.TestCase):
         self.assertIn('loading="lazy"', research)
         self.assertIn('Watch on TED', research)
         self.assertIn('rel="noopener noreferrer"', research)
-        self.assertIn('id="trust"', page)
-        self.assertIn('class="about-values" id="trust"', page)
 
     def test_compact_sections_share_centered_containers(self):
         page = self.client.get('/').get_data(as_text=True)

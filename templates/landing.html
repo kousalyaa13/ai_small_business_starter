@@ -14,7 +14,7 @@
     <a class="brand" href="/" aria-label="BloomBots home"><img class="brand-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true">BloomBots<span class="brand-period">.</span></a>
   <button class="menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-controls="primary-nav" aria-expanded="false">☰</button>
   <nav id="primary-nav" class="nav-links" aria-label="Main navigation">
-   <a href="#solutions">Solutions</a><a href="#industries">Industries</a><a href="#approach">How it works</a><a href="#research">Research</a><a href="#about">About us</a>
+   <a href="#approach">How it Works</a><a href="#industries">Your Growth Plan</a><a href="#research">Research</a><a href="#about">About Us</a>
    <a class="nav-cta" href="/consult">Help my business bloom <span aria-hidden="true">↗</span></a>
   </nav>
  </div>
@@ -100,7 +100,7 @@
   <div class="section-heading-row"><div><span class="eyebrow">AI is opening doors. Finding the right tools shouldn't be the hard part.</span><h2>Small businesses have big impact.<br><em>Here's what research shows:</em></h2></div></div>
   <div class="stats-grid">
   {% for stat in content.stats %}
-   <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
+   <article class="stat-card"><div class="stat-number">{{ stat.value }}</div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
   <div class="research-quotes-grid">
