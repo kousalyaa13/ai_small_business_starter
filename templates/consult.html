@@ -221,7 +221,7 @@ function renderQuestions(){
   const j=await r.json();if(!r.ok){alert(j.error||'Could not save answers');return}form.hidden=true;setTimeout(poll,400)};
 }
 
-const MATCH={catalog:['b-catalog','In our reviewed catalog'],web:['b-web','Found on the web · not vetted'],none:['b-none','No tool found'],pending:['b-pending','Checking…']};
+const MATCH={catalog:['b-catalog','In our reviewed catalog'],web:['b-web','Found on the web · Unverified'],none:['b-none','No tool found'],pending:['b-pending','Checking…']};
 function renderComponents(){
  $('components').innerHTML=(data.components||[]).map(c=>{const m=MATCH[c.match]||MATCH.pending;
   return `<div class="comp"><span class="badge ${m[0]}">${esc(m[1])}</span><div><b>${esc(c.description)}</b>
@@ -229,7 +229,7 @@ function renderComponents(){
  const notes=data.research_notes||[];$('notes').hidden=!notes.length;$('notes').innerHTML=notes.map(n=>'<li>'+esc(n)+'</li>').join('');
 }
 
-const SRC={catalog:['b-catalog','Reviewed'],web:['b-web','Not vetted'],owned:['b-owned','You already use'],native:['b-native','Built in'],none:['b-none','Gap']};
+const SRC={catalog:['b-catalog','Reviewed'],web:['b-web','Unverified'],owned:['b-owned','You already use'],native:['b-native','Built in'],none:['b-none','Gap']};
 function renderPlan(){
  const plan=data.plan,approval=data.approval;$('plan-card').hidden=!plan;if(!plan)return;
  if(!plan.options.length){
