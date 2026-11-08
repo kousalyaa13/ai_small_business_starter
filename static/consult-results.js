@@ -342,8 +342,8 @@
     else if (!o) message = 'Pricing your selection…';
     else if (searching()) message = 'You can save once the search for “' + researchingNames() +
       '” finishes (about a minute), so the plan includes the latest tools.';
-    else if (unpriced.length) message = [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
-      ' doesn’t list a price on its website, so this selection can’t be saved yet. Pick another tool or skip that need.';
+    else if (unpriced.length) message = 'Pricing needs verification for ' + [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
+      '. Visit each tool’s website to confirm its current price. These costs are not included in the estimated subtotal.';
     else canSave = true;
     const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
       !['skipped','existing','native','none'].includes(a.source)) || [];
