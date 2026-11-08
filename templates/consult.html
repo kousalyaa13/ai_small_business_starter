@@ -132,8 +132,23 @@ const suggestedProblems={admin:'We spend too much time on repetitive paperwork a
 const challenge=landingContext.get('challenge');
 if(challenge&&Object.hasOwn(suggestedProblems,challenge))document.querySelector('#intake-form [name="problem_text"]').value=suggestedProblems[challenge];
 const industry=landingContext.get('industry');
-const industryNames={restaurant:'restaurant or café',retail:'retail shop',services:'professional services business',hvac:'home services business',landscaping:'landscaping business',other:'small business'};
-if(industry&&Object.hasOwn(industryNames,industry))document.querySelector('#intake-form [name="business_type"]').value=industryNames[industry];
+const industryExamples={
+ restaurant:{type:'restaurant or café',problem:'We run a busy café or restaurant and struggle to keep reservations, staff schedules, and customer follow-ups organized. We want to reduce manual coordination, avoid missed bookings, and find an affordable tool that fits our daily operations.'},
+ retail:{type:'retail shop or boutique',problem:'We run a retail shop and have trouble keeping inventory accurate across sales and restocking. We want to know when popular products are running low, avoid stockouts, and make it easier to follow up with customers without extra manual work.'},
+ services:{type:'professional services business',problem:'We run a professional services business and spend too much time collecting new client details, scheduling consultations, and sending follow-ups. We want a simpler client intake process that keeps records organized and reduces repetitive administrative work.'},
+ hvac:{type:'home services business',problem:'We run a home services business and need a better way to organize incoming service requests, schedule technicians, and send estimates or invoices. We want fewer missed appointments and less manual coordination between the office and field team.'},
+ landscaping:{type:'landscaping business',problem:'We manage landscaping jobs for multiple customers and struggle to coordinate crew schedules, track recurring visits, and communicate job updates. We want an easier way to plan routes, manage ongoing work, and keep customers informed.'},
+ other:{type:'small business',problem:'We run a small business and spend too much time on repetitive tasks, scattered records, and manual follow-ups. We want to identify one workflow we can simplify with affordable software without disrupting our current operations.'}
+};
+// Industry cards intentionally provide a useful starting example, never a submitted answer.
+// A specifically selected challenge takes priority if both query parameters are present.
+if(industry&&Object.hasOwn(industryExamples,industry)){
+ const example=industryExamples[industry];
+ document.querySelector('#intake-form [name="business_type"]').value=example.type;
+ if(!challenge||!Object.hasOwn(suggestedProblems,challenge)){
+  document.querySelector('#intake-form [name="problem_text"]').value=example.problem;
+ }
+}
 let projectId=new URLSearchParams(location.search).get('project'),timer=null,data=null,approveKey=null;
 
 function num(v){return v===''||v==null?null:Number(v)}
