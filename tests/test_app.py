@@ -54,6 +54,27 @@ class AppTests(unittest.TestCase):
         self.assertIn("if(!challenge||!Object.hasOwn(suggestedProblems,challenge))", page)
         self.assertIn('example.problem;', page)
 
+    def test_bloombots_brand_and_about(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn('Every business', page)
+        self.assertIn('deserves to', page)
+        self.assertIn('id="about"', page)
+        self.assertIn('SproutBot', page)
+        self.assertIn('sproutbot.svg', page)
+        self.assertIn('early-stage hackathon project', page)
+        self.assertIn('id="challenge-form"', page)
+        self.assertIn('href="/consult?industry=', page)
+        self.assertIn('source_url', project.landing_content()['stats'][0])
+
+    def test_bloombots_solutions_brand(self):
+        response = self.client.get('/solutions')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'BloomBots', response.data)
+        self.assertIn(b'sproutbot.svg', response.data)
+        self.assertIn(b'id="verification"', response.data)
+
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})
         self.assertEqual(r.status_code,200)
