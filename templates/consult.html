@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BloomBot AI — Your personalized solution</title>
+<title>BloomBots — Your personalized solution</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-recovery.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-results.css') }}">
 <style>
-:root{--ink:#162336;--muted:#687587;--line:#e5eaf0;--page:#f7f8f7;--blue:#345fe7;--teal:#108c78;--amber:#c37923;--violet:#6b4cbd;--red:#a62f42}
+:root{--ink:#342445;--muted:#675c76;--line:#e8e0ee;--page:#fcf8ff;--blue:#7546c8;--teal:#7e4eaa;--amber:#a86b25;--violet:#8752b4;--red:#a62f42}
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #f0b651;outline-offset:3px}
 [hidden]{display:none!important}
@@ -32,11 +32,19 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
 .alts{margin-top:6px;font-size:12px}.alts summary{font-weight:700;color:var(--blue)}.alts ul{margin:6px 0 2px;padding-left:18px}.alts li{margin:3px 0}
 @media(max-width:760px){.fields{grid-template-columns:1fr}.submit-line{flex-direction:column;align-items:stretch}}
 </style>
-</head>
+<style>
+.logo-mascot{width:42px;height:42px;object-fit:contain;flex:none}
+.top{background:#fffaff;border-bottom-color:#eadff2}
+.logo{color:#432c62}.logo span:last-child{color:#a75dbe}
+.card{border-color:#eadff2;box-shadow:0 6px 24px #7851a40b}
+.btn.blue{background:#7546c8}.btn.blue:hover{background:#6135b1}
+.choice input:checked+span{background:#f4eaff;color:#603a93;border-color:#8c58bd}
+input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline-color:#9d64c5}
+</style></head>
 <body>
 <header class="top">
- <a class="logo" href="/"><span class="logo-mark">✳</span> BloomBot<span>AI</span></a>
- <a class="btn light" href="/">Back to BloomBot AI</a>
+ <a class="logo" href="/"><img class="logo-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"> BloomBots<span>.</span></a>
+ <a class="btn light" href="/">Back to BloomBots home</a>
 </header>
 <main class="shell">
  <section id="intake">

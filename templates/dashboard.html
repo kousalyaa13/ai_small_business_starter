@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BloomBot AI — Your business decision dashboard</title>
+<title>BloomBots — Your business decision dashboard</title>
 <style>
-:root{--ink:#162336;--muted:#687587;--line:#e5eaf0;--page:#f7f8f7;--blue:#345fe7;--teal:#108c78;--amber:#c37923;--violet:#6b4cbd;--red:#a62f42}
+:root{--ink:#342445;--muted:#675c76;--line:#e8e0ee;--page:#fcf8ff;--blue:#7546c8;--teal:#7e4eaa;--amber:#a86b25;--violet:#8752b4;--red:#a62f42}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}a:hover{text-decoration:none}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #f0b651;outline-offset:3px}
 [hidden]{display:none!important}.top{height:72px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 800px)/2));gap:16px}
@@ -47,10 +47,18 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
 @media(max-width:640px){.shell{padding:24px 14px 46px}.top{height:64px;padding:0 14px}.card{padding:19px}.fields,.optional .fields{grid-template-columns:1fr}.flow-list{grid-template-columns:repeat(2,1fr)}.top-actions .btn{padding:9px 11px;font-size:12px}.more>summary small{display:none}}
 @media print{@page{margin:16mm}body{background:white}.top,.shell{display:none!important}#print-area{display:block!important;color:#182536;font:13px/1.5 Arial,sans-serif}#print-area h1{font-size:26px;letter-spacing:-1px}#print-area h2{font-size:17px;margin:17px 0 5px}#print-area ul{padding-left:20px}#print-area p{color:#344155}#print-area .print-meta{border-bottom:2px solid #182536;padding-bottom:12px}}
 </style>
-</head>
+<style>
+.logo-mascot{width:42px;height:42px;object-fit:contain;flex:none}
+.top{background:#fffaff;border-bottom-color:#eadff2}
+.logo{color:#432c62}.logo span:last-child{color:#a75dbe}
+.card{border-color:#eadff2;box-shadow:0 6px 24px #7851a40b}
+.btn.blue{background:#7546c8}.btn.blue:hover{background:#6135b1}
+.choice input:checked+span{background:#f4eaff;color:#603a93;border-color:#8c58bd}
+input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline-color:#9d64c5}
+</style></head>
 <body>
 <header class="top">
-<a class="logo" href="/" aria-label="BloomBot AI home"><span class="logo-mark">✳</span> BloomBot<span>AI</span></a>
+<a class="logo" href="/" aria-label="BloomBots home"><img class="logo-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"> BloomBots<span>.</span></a>
 <div class="top-actions"><a class="btn light" href="/consult" id="consult-link">Describe a problem →</a><button id="edit-btn" class="btn light" hidden>Edit answers</button></div>
 </header>
 <main class="shell">
@@ -164,7 +172,7 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
   </div>
  </details>
 
- <p class="bottom-note">BloomBot AI prototype · Recommendations are rules-based suggestions, not endorsements · Prices come from vendor sites on the date shown; confirm before buying · No outside accounts are connected.</p>
+ <p class="bottom-note">BloomBots prototype · Recommendations are rules-based suggestions, not endorsements · Prices come from vendor sites on the date shown; confirm before buying · No outside accounts are connected.</p>
 </section>
 </main>
 <div id="print-area" aria-hidden="true"></div>
@@ -290,7 +298,7 @@ $('preview-btn').addEventListener('click',runPreview);
 $('export-btn').addEventListener('click',()=>{
  if(!report)return;const top=report.tools?.[0];const p=top?.price_estimate;const audit=report.software_audit||{};const r=report.readiness||{};
  const readiness=(r.unanswered||[]).length?'Not checked':r.score+'/100 — '+r.status;
- $('print-area').innerHTML=`<div class="print-meta"><span>BloomBot AI · Decision Passport</span><h1>${esc(profile.business||'Your business')}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
+ $('print-area').innerHTML=`<div class="print-meta"><span>BloomBots · Decision Passport</span><h1>${esc(profile.business||'Your business')}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
  <h2>Suggested starting point</h2><p>${esc(top?.name||'Your current software')}: ${esc(priceText(p))}${p?.source_url?' (price checked '+esc(dateText(p.checked_at))+', '+esc(p.source_url)+')':''}. ${esc(top?.description||'')}</p>
  <h2>Your situation</h2><p>Current software: ${esc(profile.software)} · Budget: ${money(Number(profile.budget||0))}/month · Readiness: ${esc(readiness)}</p><p>${esc(audit.try_first||'')}</p>
  <h2>Value estimate (your assumptions)</h2><p>Monthly cost: ${money(costModel.monthly||0)}. Monthly net value: ${money(costModel.net||0)}. First year: ${money(costModel.yearOne||0)}. Estimates, not guaranteed savings.</p>
