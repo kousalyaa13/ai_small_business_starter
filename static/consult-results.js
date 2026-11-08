@@ -271,13 +271,17 @@
       '<button type="button" class="nav-btn" data-scroll="1" aria-label="Next tools">›</button></span></div>' +
       '<div class="carousel-track" id="carousel-track" role="list" tabindex="0" aria-label="Tools for this need">' +
       tools.map(t => toolCard(need, t, canEdit, isNew(t), current)).join('') + '</div>' +
-      (all.length > TOP_TOOLS ? '<button type="button" class="link-btn" data-all="' + escape(need.id) + '">' +
-        (showAll ? 'Show top ' + TOP_TOOLS + ' only' : 'Show all ' + all.length + ' tools') + '</button>' : '') + '</div>' :
+      '</div>' :
       '<p class="caption">No suitable tool found for this need yet. Mark it as already handled, skip it, or search for better options.</p>';
     const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
       (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
       (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
+    // "Show all" sits outside any one picker style, so it works with the comparison table.
+    const showAllLink = all.length > TOP_TOOLS ? '<button type="button" class="link-btn show-all-btn" data-all="' +
+      escape(need.id) + '">' + (showAll ? 'Show top ' + TOP_TOOLS + ' only' : 'Show all ' + all.length + ' tools') +
+      '</button>' : '';
     return head + searchBanner(need, tools.filter(isNew), current) + share + compareTools(need, tools, canEdit) + carousel +
+      showAllLink +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
   }
