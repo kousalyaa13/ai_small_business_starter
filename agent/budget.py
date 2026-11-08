@@ -20,9 +20,9 @@ class BudgetExceeded(Exception):
 
 @dataclass
 class Limits:
-    max_searches: int = 6
-    max_fetches: int = 12
-    max_model_calls: int = 20
+    max_searches: int = 30
+    max_fetches: int = 30
+    max_model_calls: int = 40
     max_run_tokens: int = 200_000
     max_run_usd: float | None = 1.00
     # Unit prices are configuration, not assumptions baked into code. When unset,
@@ -36,9 +36,9 @@ class Limits:
     @classmethod
     def from_env(cls):
         return cls(
-            max_searches=int(_env_float("AGENT_MAX_SEARCHES", 6)),
-            max_fetches=int(_env_float("AGENT_MAX_FETCHES", 12)),
-            max_model_calls=int(_env_float("AGENT_MAX_MODEL_CALLS", 20)),
+            max_searches=int(_env_float("AGENT_MAX_SEARCHES", 30)),
+            max_fetches=int(_env_float("AGENT_MAX_FETCHES", 30)),
+            max_model_calls=int(_env_float("AGENT_MAX_MODEL_CALLS", 40)),
             max_run_tokens=int(_env_float("AGENT_MAX_RUN_TOKENS", 200_000)),
             max_run_usd=_env_float("AGENT_MAX_RUN_USD", 1.00),
             price_in_per_mtok=_env_float("AGENT_PRICE_IN_PER_MTOK"),

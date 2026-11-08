@@ -31,7 +31,9 @@ def _native(component: Component, picks: dict[str, Candidate | None]) -> Candida
 def _pick_cheapest(component, cands, intake, chosen_tools):
     if not cands:
         return None
-    return min(cands, key=lambda c: (_min_cost(c, intake), not c.owned, c.tool_id not in chosen_tools, not c.vetted, c.name))
+    # Developer-only tools are shown as alternatives but are not picked while a no/low-code tool exists.
+    return min(cands, key=lambda c: (c.setup_complexity == "developer", _min_cost(c, intake), not c.owned,
+                                     c.tool_id not in chosen_tools, not c.vetted, c.name))
 
 
 def strategy_lowest_cost(components, cands_by, intake, vetted_only=False):
@@ -52,7 +54,8 @@ def strategy_fewest_tools(components, cands_by, intake):
                 tools.setdefault(cand.tool_id, (cand, []))[1].append(comp.id)
         if not tools:
             break
-        cand, covered = max(tools.values(), key=lambda t: (len(t[1]), t[0].vetted, -_min_cost(t[0], intake)))
+        cand, covered = max(tools.values(), key=lambda t: (t[0].setup_complexity != "developer", len(t[1]),
+                                                           t[0].vetted, -_min_cost(t[0], intake)))
         for cid in covered:
             picks[cid] = cand
         remaining = [c for c in remaining if c.id not in covered]
@@ -63,7 +66,26 @@ def strategy_fewest_tools(components, cands_by, intake):
     return picks
 
 
-def build_option(option_id, title, summary, components, picks, intake: Intake) -> Option:
+def alternatives_for(comp, chosen_id, cands_by, intake: Intake) -> list[dict]:
+    """Every other tool that fits this part, cheapest first, so the customer sees the full field."""
+    rows = []
+    for c in cands_by.get(comp.id, []):
+        if c.tool_id == chosen_id:
+            continue
+        if _covered_by_owned(c):
+            plan, cost = "Your current plan", 0.0
+        else:
+            choice = choose_plan(c.plans, intake.usage)
+            plan, cost = (choice.plan.name if choice.plan else None), choice.monthly_cost
+        rows.append({"tool_id": c.tool_id, "name": c.name, "source": "owned" if _covered_by_owned(c) else c.source,
+                     "vetted": c.vetted, "plan_name": plan, "monthly_cost": cost,
+                     "site": c.site, "pricing_source_url": c.pricing_source_url,
+                     "setup_complexity": c.setup_complexity, "best_for": c.best_for or c.audience})
+    return sorted(rows, key=lambda r: (r["setup_complexity"] == "developer", r["monthly_cost"] is None,
+                                       r["monthly_cost"] or 0, r["name"]))
+
+
+def build_option(option_id, title, summary, components, picks, intake: Intake, cands_by=None) -> Option:
     usage = intake.usage
     tool_costs: dict[str, float | None] = {}
     tool_plan: dict[str, tuple[str | None, list[str]]] = {}
@@ -113,7 +135,9 @@ def build_option(option_id, title, summary, components, picks, intake: Intake) -
             tool_id=cand.tool_id, tool_name=cand.name,
             source="owned" if _covered_by_owned(cand) else cand.source, vetted=cand.vetted, plan_name=plan_name,
             monthly_cost=cost if tool_costs[cand.tool_id] is not None else None, cost_basis=basis,
-            source_url=cand.pricing_source_url or cand.site))
+            source_url=cand.pricing_source_url or cand.site, setup_complexity=cand.setup_complexity,
+            best_for=cand.best_for or cand.audience,
+            alternatives=alternatives_for(comp, cand.tool_id, cands_by or {}, intake)))
 
     total, complete, within = option_total(tool_costs, intake.monthly_budget)
     assumptions.insert(0, f"Assumes {usage.seats} user seat(s)"
@@ -152,9 +176,14 @@ def build_options(components: list[Component], cands_by: dict[str, list[Candidat
         if signature in seen:
             continue
         seen.add(signature)
-        options.append(build_option(f"opt{len(options) + 1}", title, summary, components, picks, intake))
-    # Within-budget options first, then cheapest known total.
-    options.sort(key=lambda o: (o.within_budget is not True, o.monthly_total if o.monthly_total is not None else INF))
+        option = build_option(f"opt{len(options) + 1}", title, summary, components, picks, intake, cands_by)
+        # An option with a part left uncovered can't be acted on, so it is not offered.
+        if any(a.source == "none" for a in option.assignments):
+            continue
+        options.append(option)
+    # Options a small business can set up without developers first, then within budget, then cheapest.
+    options.sort(key=lambda o: (any(a.setup_complexity == "developer" for a in o.assignments),
+                                o.within_budget is not True, o.monthly_total if o.monthly_total is not None else INF))
     for i, opt in enumerate(options, start=1):
         opt.id = f"opt{i}"
     return options[:3]

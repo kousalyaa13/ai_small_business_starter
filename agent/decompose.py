@@ -14,9 +14,18 @@ MAX_CONSTRAINTS = 3
 DECOMPOSE_INSTRUCTIONS = """You are a technical consultant for small businesses.
 Break the owner's problem into the smallest set of components that existing software products can handle.
 Rules:
-- Each component gets exactly one capability tag from the allowed list. Use "other" only if nothing fits.
+- Each component gets exactly one capability tag from the allowed list. The tag must describe the
+  component's main job, the thing a typical product with that tag does on its own. If the main job is
+  something else that merely involves a tagged task (e.g. answering phone calls and also booking jobs),
+  use "other" for that main job; add a separate tagged component only if a separate tool is needed.
+  Example: an AI phone receptionist that books appointments is "other", not "appointment_booking".
+- Only include components the owner's outcome needs. Do not add extras they did not ask for
+  (e.g. separate file storage, backups, analytics or reporting) unless the outcome cannot work without them.
 - Add a "workflow_automation" component only when data must move between two different components;
   list the ids of those components in "connects".
+- search_query: 3 to 8 plain words a business owner would type into a search engine to find tools
+  for this component, including the business type when known (e.g. "AI receptionist for plumbers",
+  "online booking app for hair salons"). No jargon, no budget, no punctuation.
 - description: plain language a business owner understands, 15 words or fewer.
 - constraints: at most 3 per component. Include only requirements the owner stated or that are
   strictly necessary for the component to work. Do not invent features, quantities or extras.
@@ -35,6 +44,7 @@ def intake_prompt(intake: Intake, round_no: int) -> str:
     lines = [
         f"Problem: {intake.problem_text}",
         f"Business: {intake.business_name or 'not provided'}",
+        f"Business type: {intake.business_type or 'not provided'}",
         f"Existing software: {', '.join(intake.existing_software) or 'none listed'}",
         f"Monthly budget: {'not provided' if intake.monthly_budget is None else f'${intake.monthly_budget:g}'}",
         f"Total people needing access: {u.seats}",
@@ -57,6 +67,7 @@ def clean_decomposition(result: Decomposition, intake: Intake) -> tuple[list[Com
     for comp in components:
         comp.connects = [cid for cid in comp.connects if cid in seen and cid != comp.id]
         comp.constraints = comp.constraints[:MAX_CONSTRAINTS]
+        comp.search_query = " ".join(comp.search_query.split())[:100] or comp.description[:80]
     answered = {"monthly_budget": intake.monthly_budget is not None,
                 "monthly_volume": intake.usage.monthly_volume is not None,
                 "contacts": intake.usage.contacts is not None,

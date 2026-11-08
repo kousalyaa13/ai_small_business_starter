@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -29,6 +29,7 @@ class Page:
     description: str
     headings: str
     text: str
+    links: list[str] = field(default_factory=list)  # absolute outbound https links
 
 
 def _host_allowed(host: str, allowed_domains) -> bool:
@@ -63,8 +64,10 @@ def page_from_html(url: str, html: str) -> Page:
     headings = " | ".join(h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2"], limit=10))[:1200]
     for junk in soup(["nav", "footer"]):
         junk.decompose()
+    links = list(dict.fromkeys(urljoin(url, a["href"]) for a in soup.find_all("a", href=True)
+                               if urljoin(url, a["href"]).startswith("https://")))[:300]
     text = " ".join(soup.get_text(" ", strip=True).split())
-    return Page(url=url, title=title, description=description, headings=headings, text=text)
+    return Page(url=url, title=title, description=description, headings=headings, text=text, links=links)
 
 
 class SafeFetcher:

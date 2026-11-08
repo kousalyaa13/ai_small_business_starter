@@ -45,10 +45,20 @@ CREATE TABLE IF NOT EXISTS usage_records (
 CREATE TABLE IF NOT EXISTS discovered (
     id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT, title TEXT, summary TEXT, evidence TEXT,
     created_at TEXT, status TEXT);
+CREATE TABLE IF NOT EXISTS discovered_tools (
+    tool_id TEXT PRIMARY KEY, name TEXT NOT NULL, site TEXT NOT NULL, description TEXT,
+    capabilities TEXT NOT NULL, needs TEXT NOT NULL, plans TEXT NOT NULL, evidence TEXT NOT NULL,
+    pricing_source_url TEXT, status TEXT NOT NULL DEFAULT 'unvetted',
+    first_seen TEXT NOT NULL, last_checked TEXT NOT NULL, times_seen INTEGER NOT NULL DEFAULT 1,
+    audience TEXT, setup_complexity TEXT, best_for TEXT, mentions INTEGER DEFAULT 0, small_business_fit INTEGER);
 CREATE TABLE IF NOT EXISTS research_cache (
     run_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, payload TEXT NOT NULL,
     PRIMARY KEY (run_id, kind, key));
 """
+
+
+DISCOVERED_COLUMNS = {"audience": "TEXT", "setup_complexity": "TEXT", "best_for": "TEXT",
+                      "mentions": "INTEGER DEFAULT 0", "small_business_fit": "INTEGER"}
 
 
 class RunActive(Exception):
@@ -83,6 +93,11 @@ class Store:
         with self.connect() as con:
             con.execute("PRAGMA journal_mode=WAL")
             con.executescript(SCHEMA)
+            # Databases created before these columns existed get them added in place.
+            have = {r[1] for r in con.execute("PRAGMA table_info(discovered_tools)")}
+            for column, kind in DISCOVERED_COLUMNS.items():
+                if column not in have:
+                    con.execute(f"ALTER TABLE discovered_tools ADD COLUMN {column} {kind}")
 
     @contextmanager
     def connect(self):
@@ -331,14 +346,48 @@ class Store:
                                "WHERE run_id=? GROUP BY kind", (run_id,)).fetchall()
         return {r["kind"]: dict(r) for r in rows}
 
-    def save_discovered(self, candidate):
-        """Web finds go to the review queue; they are never auto-promoted to the vetted catalog."""
+    def save_discovered(self, candidate, need):
+        """Upsert a web-discovered tool so later runs can reuse it.
+
+        Rediscovery refreshes plans, evidence and last_checked, and merges capabilities and
+        the needs it was found for. Tools stay 'unvetted' until a person reviews them.
+        """
+        ts = now_iso()
         with self.tx() as con:
-            if con.execute("SELECT 1 FROM discovered WHERE url=?", (candidate.site,)).fetchone():
-                return
-            con.execute("INSERT INTO discovered(url, title, summary, evidence, created_at, status) VALUES (?,?,?,?,?,?)",
-                        (candidate.site, candidate.name, candidate.description,
-                         json.dumps([e.model_dump() for e in candidate.evidence]), now_iso(), "Needs review"))
+            row = con.execute("SELECT capabilities, needs FROM discovered_tools WHERE tool_id=?",
+                              (candidate.tool_id,)).fetchone()
+            caps = list(dict.fromkeys([*(json.loads(row["capabilities"]) if row else []), *candidate.capabilities]))
+            needs = list(dict.fromkeys([*(json.loads(row["needs"]) if row else []), need]))[-10:]
+            values = (candidate.name, candidate.site, candidate.description, json.dumps(caps), json.dumps(needs),
+                      json.dumps([p.model_dump() for p in candidate.plans]),
+                      json.dumps([e.model_dump() for e in candidate.evidence]), candidate.pricing_source_url, ts,
+                      candidate.audience, candidate.setup_complexity, candidate.best_for, candidate.mentions, 1)
+            columns = ("name, site, description, capabilities, needs, plans, evidence, pricing_source_url, "
+                       "last_checked, audience, setup_complexity, best_for, mentions, small_business_fit")
+            if row:
+                assignments = ", ".join(f"{c.strip()}=?" for c in columns.split(","))
+                con.execute(f"UPDATE discovered_tools SET {assignments}, times_seen=times_seen+1 WHERE tool_id=?",
+                            (*values, candidate.tool_id))
+            else:
+                con.execute(f"INSERT INTO discovered_tools({columns}, tool_id, first_seen) "
+                            f"VALUES ({', '.join('?' * (len(values) + 2))})", (*values, candidate.tool_id, ts))
+
+    def discovered_tools(self, max_age_days=30):
+        """Discovered tools checked within max_age_days; older ones should be researched again."""
+        cutoff = datetime.fromtimestamp(time.time() - max_age_days * 86400, timezone.utc).isoformat(timespec="seconds")
+        with self.connect() as con:
+            # Only tools that passed the small-business check are reused; older entries saved
+            # before that check (small_business_fit NULL) are researched again instead.
+            rows = con.execute("SELECT * FROM discovered_tools WHERE last_checked >= ? AND status != 'rejected' "
+                               "AND small_business_fit = 1 ORDER BY times_seen DESC, last_checked DESC",
+                               (cutoff,)).fetchall()
+        tools = []
+        for row in rows:
+            tool = dict(row)
+            for key in ("capabilities", "needs", "plans", "evidence"):
+                tool[key] = json.loads(tool[key])
+            tools.append(tool)
+        return tools
 
     def cache_get(self, run_id, kind, key):
         with self.connect() as con:

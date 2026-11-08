@@ -13,7 +13,8 @@ from typing import Protocol, TypeVar
 from pydantic import BaseModel
 
 from .capabilities import CAPABILITIES, KEYWORDS, VOLUME_SENSITIVE
-from .schemas import ClarifyingQuestion, Component, Decomposition, ExtractedPlan, ExtractedTool
+from .schemas import (ArticleTools, ClarifyingQuestion, Component, Decomposition, ExtractedPlan, ExtractedTool,
+                      ToolMention)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -34,7 +35,19 @@ class ModelClient(Protocol):
         ...
 
 
-OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano"}
+OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano", "mine": "openai/gpt-5-nano"}
+
+
+# Default reasoning made each extraction call take 18-32 s. "low" measured ~23 s for a whole
+# research step (3 candidates in parallel) with correct relevance; "minimal" was ~10 s but
+# tagged unrelated products with almost every capability.
+# Override with AGENT_REASONING_<TASK> (none|minimal|low|medium|high).
+REASONING_DEFAULTS = {"extract": "low", "mine": "low"}
+
+
+def reasoning_for(task: str) -> str | None:
+    value = os.environ.get(f"AGENT_REASONING_{task.upper()}", REASONING_DEFAULTS.get(task, ""))
+    return value.strip().lower() or None
 
 
 def model_for(task: str, provider: str = "openai") -> str:
@@ -56,8 +69,10 @@ class OpenAIModel:
     def structured(self, task, instructions, content, schema):
         model = model_for(task)
         # Static instructions come first so provider-side prompt caching can reuse them.
+        effort = reasoning_for(task)
+        extra = {"reasoning": {"effort": effort}} if effort else {}
         response = self.client.responses.parse(model=model, instructions=instructions,
-                                               input=content, text_format=schema)
+                                               input=content, text_format=schema, **extra)
         usage = getattr(response, "usage", None)
         details = getattr(usage, "input_tokens_details", None)
         return response.output_parsed, ModelUsage(
@@ -80,12 +95,15 @@ class OpenRouterModel:
 
     def structured(self, task, instructions, content, schema):
         model = model_for(task, self.name)
+        body = {"provider": {"require_parameters": True}}
+        if effort := reasoning_for(task):
+            body["reasoning"] = {"effort": effort}
         response = self.client.chat.completions.parse(
             model=model,
             messages=[{"role": "system", "content": instructions}, {"role": "user", "content": content}],
             response_format=schema,
             # Only route to provider endpoints that honour structured output.
-            extra_body={"provider": {"require_parameters": True}},
+            extra_body=body,
         )
         message = response.choices[0].message
         if message.parsed is None:
@@ -113,6 +131,8 @@ class StubModel:
             result = self._decompose(content)
         elif schema is ExtractedTool:
             result = self._extract(content)
+        elif schema is ArticleTools:
+            result = self._mine(content)
         else:
             raise ValueError(f"Stub model cannot produce {schema.__name__}")
         return result, ModelUsage(provider=self.name, model="stub", input_tokens=len(content) // 4,
@@ -131,13 +151,19 @@ class StubModel:
         components = []
         constraints = ["Avoid duplicate records (match on email)"] if re.search(r"duplicat", problem) else []
         for i, cap in enumerate(found, start=1):
-            components.append(Component(id=f"c{i}", capability=cap, description=CAPABILITIES.get(cap, "Clarify this business task"),
+            # Owner-friendly descriptions; an 'other' part keeps the owner's wording so saved tools can be matched to it.
+            description = (self._field(content, "Problem")[:120] if cap == "other"
+                           else CAPABILITIES.get(cap, "Clarify this business task"))
+            query = (" ".join(re.findall(r"[a-z]+", description.lower())[:6]) if cap == "other"
+                     else f"{cap.replace('_', ' ')} software") + " for small business"
+            components.append(Component(id=f"c{i}", capability=cap, description=description, search_query=query,
                                         constraints=constraints if cap == "crm_contacts" else [], connects=[]))
         # "When X happens, add/send to Y" between two systems implies a connector.
         if len(components) >= 2 and re.search(r"\b(whenever|when|automatic|sync|add them|send them)\b", problem):
             components.append(Component(id=f"c{len(components) + 1}", capability="workflow_automation",
                                         description="Move each new record between the apps automatically",
-                                        constraints=constraints, connects=[c.id for c in components[:2]]))
+                                        constraints=constraints, connects=[c.id for c in components[:2]],
+                                        search_query="tool to connect apps automatically for small business"))
         questions = []
         if self._field(content, "Monthly budget") in ("", "not provided"):
             questions.append(ClarifyingQuestion(id="q_budget", field="monthly_budget",
@@ -152,6 +178,9 @@ class StubModel:
     def _extract(self, content):
         name = self._field(content, "Page title").split("|")[0].split(" - ")[0].strip() or "Unknown tool"
         text = content.split("Page text:", 1)[-1]
+        need = self._field(content, "Component needed").split("—", 1)[-1]
+        need_words = {w for w in re.findall(r"[a-z]{4,}", need.lower())}
+        fits = bool(need_words) and sum(w in text.lower() for w in need_words) >= max(1, len(need_words) // 2)
         caps = [cap for cap, words in KEYWORDS.items() if any(w in text.lower() for w in words)]
         plans = []
         for match in PRICE_RE.finditer(text):
@@ -162,8 +191,26 @@ class StubModel:
             if len(plans) == 3:
                 break
         description = " ".join(text.split()[:20])
-        return ExtractedTool(is_vendor_product_page=bool(caps), name=name, capabilities=caps,
+        enterprise = bool(re.search(r"\benterprise(s)? only\b|for large enterprises", text, re.I))
+        return ExtractedTool(is_vendor_product_page=bool(caps) or fits, fits_need=fits, name=name, capabilities=caps,
+                             small_business_fit=not enterprise, audience="enterprises" if enterprise else "small businesses",
+                             setup_complexity="developer" if re.search(r"\bAPI\b|SDK|developers?", text) else "unknown",
                              description_quote=description, plans=plans, api_available=None, api_quote="")
+
+
+def _stub_mine(content):
+    """Offline stand-in: every linked website named in the article text becomes a mention."""
+    hosts = re.search(r"^Websites linked from the article: (.*)$", content, re.M)
+    text = content.split("Article text:", 1)[-1].lower()
+    tools = []
+    for host in [h.strip() for h in (hosts.group(1) if hosts else "").split(",") if h.strip()]:
+        name = host.split(".")[0]
+        if name in text:
+            tools.append(ToolMention(name=name.capitalize(), best_for="", url=f"https://{host}/"))
+    return ArticleTools(tools=tools)
+
+
+StubModel._mine = staticmethod(_stub_mine)
 
 
 def default_model() -> ModelClient:

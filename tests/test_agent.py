@@ -130,7 +130,9 @@ class WorkflowTests(unittest.TestCase):
         pid, _ = svc.start(Intake(problem_text="Create a custom spacecraft control system",
                                   monthly_budget=75))
         result = svc.status(pid)
-        self.assertEqual(result["run"]["status"], "waiting_approval")
+        # No complete option exists, so the run ends instead of waiting for an approval that can't happen;
+        # the recovery panel still offers ways to revise the request.
+        self.assertEqual((result["run"]["status"], result["run"]["step"]), ("completed", "no_complete_option"))
         self.assertEqual(result["recovery"]["status"], "unrecognized")
         with self.assertRaises(ValueError):
             svc.approve(pid, ApprovalRequest(
@@ -143,6 +145,93 @@ class WorkflowTests(unittest.TestCase):
         usage = svc.status(project_id)["usage"]
         self.assertEqual(usage["model_calls"], 1)
         self.assertGreater(usage["tokens"], 0)
+
+
+class DiscoveryReuseTests(unittest.TestCase):
+    """A need researched once is answered from the database next time, without searching."""
+
+    PHONE = "Answer incoming phone calls and capture caller details for my plumbing business"
+    PAGE = ("<html><head><title>CallDesk</title></head><body><p>CallDesk answers incoming phone calls and "
+            "captures caller details for plumbing and other businesses.</p><p>Solo: $29/month</p></body></html>")
+
+    class Search:
+        provider = "fake"
+
+        def __init__(self, results, fail=False):
+            self.results, self.fail, self.calls = results, fail, 0
+
+        def search(self, query, count=8):
+            self.calls += 1
+            if self.fail:
+                raise AssertionError("web search should not run when a fresh discovery exists")
+            return self.results
+
+    class Fetcher:
+        def __init__(self, pages):
+            self.pages = pages
+
+        def fetch(self, url):
+            from agent.safe_fetch import page_from_html
+            if url not in self.pages:
+                raise FetchError("not found")
+            return page_from_html(url, self.pages[url])
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def first_run(self, intake):
+        from agent.research import SearchResult
+        first = make_service(self.tmp.name, search=self.Search([SearchResult("CallDesk", "https://calldesk.example/", "")]),
+                             fetcher=self.Fetcher({"https://calldesk.example/": self.PAGE}))
+        pid, _ = first.start(intake)
+        status = first.status(pid)
+        self.assertEqual(status["components"][0]["match"], "web")
+        self.assertEqual(status["plan"]["options"][0]["assignments"][0]["tool_name"], "CallDesk")
+        self.assertEqual(len(first.store.discovered_tools()), 1)
+
+    def test_enough_saved_tools_skip_search(self):
+        import os
+        from unittest import mock
+        intake = Intake(problem_text=self.PHONE, monthly_budget=50, usage=Usage(monthly_volume=40))
+        with mock.patch.dict(os.environ, {"AGENT_MIN_ALTERNATIVES": "1"}):
+            self.first_run(intake)
+            offline = self.Search([], fail=True)
+            second = make_service(self.tmp.name, search=offline, fetcher=self.Fetcher({}))
+            pid, _ = second.start(intake)
+            status = second.status(pid)
+        self.assertEqual(offline.calls, 0)
+        self.assertEqual(status["plan"]["options"][0]["assignments"][0]["tool_name"], "CallDesk")
+        self.assertTrue(any("earlier web research" in n for n in status["research_notes"]))
+
+    def test_too_few_saved_tools_are_topped_up_and_merged(self):
+        from agent.research import SearchResult
+        intake = Intake(problem_text=self.PHONE, monthly_budget=50, usage=Usage(monthly_volume=40))
+        self.first_run(intake)  # saves CallDesk only; the default minimum is 3
+        other = self.PAGE.replace("CallDesk", "RingBot").replace("$29", "$19")
+        search = self.Search([SearchResult("RingBot", "https://ringbot.example/", "")])
+        second = make_service(self.tmp.name, search=search, fetcher=self.Fetcher({"https://ringbot.example/": other}))
+        pid, _ = second.start(intake)
+        status = second.status(pid)
+        self.assertGreater(search.calls, 0)
+        self.assertEqual({c["name"] for c in status["components"][0]["candidates"]}, {"CallDesk", "RingBot"})
+        self.assertEqual(len(second.store.discovered_tools()), 2)
+
+
+class NoCompleteOptionTests(unittest.TestCase):
+    def test_run_ends_with_no_option_instead_of_waiting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = make_service(tmp)  # no search configured, so the call-answering part stays uncovered
+            pid, _ = svc.start(Intake(problem_text="Answer incoming phone calls and capture caller details",
+                                      monthly_budget=50, usage=Usage(monthly_volume=40)))
+            status = svc.status(pid)
+            self.assertEqual((status["run"]["status"], status["run"]["step"]), ("completed", "no_complete_option"))
+            self.assertEqual(status["plan"]["options"], [])
+            self.assertEqual(status["plan"]["gaps"], ["Answer incoming phone calls and capture caller details"])
+            with self.assertRaises(ValueError):
+                svc.approve(pid, ApprovalRequest(plan_version=1, option_id="opt1", idempotency_key="key-zzzzzz"))
 
 
 class ApiTests(unittest.TestCase):
