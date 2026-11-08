@@ -18,6 +18,19 @@ def stub_decompose(text, **intake):
 
 
 class DecompositionTests(unittest.TestCase):
+    def test_fiscal_budget_intake_extracts_explicit_numbers_and_asks_editors(self):
+        request = ("Need to manage my budget development and tracking every fiscal year. "
+                   "Budget of 75 per month. 5 people need access.")
+        intake = Intake(problem_text=request)
+        self.assertEqual((intake.monthly_budget, intake.usage.seats), (75, 5))
+        result = stub_decompose(request)
+        caps = {c.capability for c in result.components}
+        self.assertTrue({"budget_planning", "budget_tracking"} <= caps)
+        components, questions = clean_decomposition(result, intake)
+        self.assertEqual([q.field for q in questions], ["editors"])
+        updated = apply_answers(intake, [q.model_dump() for q in questions], {"q_editors": "3"})
+        self.assertEqual((updated.usage.seats, updated.usage.editors), (5, 3))
+
     def test_contact_form_example(self):
         result = stub_decompose(EXAMPLE, monthly_budget=30)
         caps = {c.capability: c for c in result.components}
