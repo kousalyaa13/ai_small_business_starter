@@ -67,7 +67,7 @@ class AppTests(unittest.TestCase):
             self.assertIn(quote['quote'], research)
             self.assertIn(quote['speaker'], research)
             self.assertIn(quote['source_url'], research)
-        self.assertIn(data['case_study']['title'], research)
+        self.assertIn('Pizza puts AI to work', research)  # apostrophe is HTML-escaped by Jinja
         self.assertIn(data['case_study']['source_url'], research)
         self.assertIn('Independent research and perspectives, not endorsements', research)
         self.assertEqual(research.count('<iframe '), 2)
