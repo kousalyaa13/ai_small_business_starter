@@ -10,7 +10,8 @@ from .graph import Deps, build_graph, sqlite_checkpointer
 from .llm import default_model
 from .research import default_fetcher, default_search
 from .runner import Runner
-from .schemas import Answers, ApprovalRequest, Intake, RevisionRequest
+from .options import build_selection, component_tools
+from .schemas import Answers, ApprovalRequest, Candidate, Component, Intake, RevisionRequest
 from .store import RunActive, Store
 
 AUTHORIZED_ACTIONS = ["record_selected_plan"]  # build/deploy actions arrive in a later milestone
@@ -75,7 +76,7 @@ class AgentService:
         if not changes:
             raise ValueError("Change the budget, number of editors, team size or problem to try again.")
         usage = dict(data.get("usage") or {})
-        for field in ("seats", "editors"):
+        for field in ("seats", "editors", "monthly_volume", "contacts"):
             if field in changes:
                 usage[field] = changes.pop(field)
         data["usage"] = usage
@@ -90,12 +91,41 @@ class AgentService:
         self.runner.submit(run_id)
         return version, run_id
 
+    def research_more(self, project_id, req, org_id="default"):
+        """Search again for cheaper or better tools for one part (or all), reusing the current parts."""
+        self._project(project_id, org_id)
+        run = self.store.latest_run(project_id)
+        snap = run["snapshot"] if run else {}
+        components = snap.get("components") or (snap.get("seed") or {}).get("components") or []
+        if not components:
+            raise Conflict("There are no recommendations to search from yet.")
+        ids = [c["id"] for c in components]
+        if any(cid not in ids for cid in req.component_ids):
+            raise ValueError("Choose one of the parts shown.")
+        targets = list(dict.fromkeys(req.component_ids)) or ids
+        seed = {"components": components, "summary": snap.get("summary", ""), "force_research": targets,
+                "goal": req.goal}
+        try:
+            run_id = self.store.start_followup_run(project_id, seed)
+        except RunActive as exc:
+            raise Conflict(str(exc)) from exc
+        self.runner.submit(run_id)
+        return run_id
+
     def approve(self, project_id, req: ApprovalRequest, org_id="default"):
         from .store import AlreadyApproved, StalePlan, UnknownOption
         self._project(project_id, org_id)
+        run = self.store.latest_run(project_id)
+        if run and run["status"] in ("queued", "running"):
+            raise Conflict("A search for more options is still running. Approve once the new options are ready.")
+        custom = None
+        if req.option_id == "custom":
+            if not req.selections:
+                raise ValueError("Pick a tool, 'I already have this' or 'Skip' for each need first.")
+            custom = self.price_selection(project_id, req.selections, org_id).model_dump()
         try:
             approval, created = self.store.approve(project_id, req.plan_version, req.option_id, req.max_build_budget,
-                                                   req.idempotency_key, AUTHORIZED_ACTIONS)
+                                                   req.idempotency_key, AUTHORIZED_ACTIONS, custom_option=custom)
         except StalePlan as exc:
             raise Conflict(str(exc))
         except AlreadyApproved as exc:
@@ -106,6 +136,23 @@ class AgentService:
         if run and run["status"] == "waiting_approval":
             self.runner.submit(run["id"], resume={"approval_id": approval["id"]}, from_statuses=("waiting_approval",))
         return approval, created
+
+    def _plan_context(self, project_id):
+        """Parts, candidates and intake behind the latest plan, from the run that produced it."""
+        plan = self.store.latest_plan(project_id)
+        if not plan:
+            raise Conflict("There are no recommendations yet.")
+        snap = self.store.get_run(plan["run_id"])["snapshot"]
+        _, intake = self.store.latest_requirements(project_id)
+        components = [Component.model_validate(c) for c in snap.get("components", [])]
+        cands = {cid: [Candidate.model_validate(c) for c in lst] for cid, lst in snap.get("candidates", {}).items()}
+        return plan, components, cands, Intake.model_validate(intake)
+
+    def price_selection(self, project_id, selections: dict, org_id="default"):
+        """Price the owner's picks with the same code as the suggested options."""
+        self._project(project_id, org_id)
+        _, components, cands, intake = self._plan_context(project_id)
+        return build_selection(components, cands, intake, selections)
 
     def status(self, project_id, org_id="default"):
         project = self._project(project_id, org_id)
@@ -131,12 +178,23 @@ class AgentService:
             components.append({**comp, "match": match,
                                "candidates": [{"name": c["name"], "source": c["source"], "vetted": c["vetted"],
                                                "site": c["site"]} for c in (cands or [])]})
+        if plan:
+            try:
+                _, comps_ctx, cands_ctx, intake_ctx = self._plan_context(project_id)
+                tools = component_tools(comps_ctx, cands_ctx, intake_ctx)
+                for comp in components:
+                    comp["tools"] = tools.get(comp["id"], [])
+            except Conflict:
+                pass
         usage = Meter(self.store, run["id"], project_id, Limits.from_env()).totals() if run else {}
         recovery = recovery_for(Intake.model_validate(intake), snap.get("components", []), self.catalog_loader()) if plan else None
         return {
             "project": {"id": project["id"], "created_at": project["created_at"]},
             "requirement_version": version, "intake": intake,
-            "run": {"id": run["id"], "status": run["status"], "step": run["step"], "error": run["error"]} if run else None,
+            "run": {"id": run["id"], "status": run["status"], "step": run["step"], "error": run["error"],
+                    # needs a follow-up search is working on, so the page can show progress on those rows
+                    "researching": (snap.get("seed") or {}).get("force_research", [])
+                    if run["status"] in ("queued", "running") else []} if run else None,
             "summary": snap.get("summary", ""),
             "questions": snap.get("questions", []) if run and run["status"] == "waiting_input" else [],
             "components": components, "research_notes": snap.get("research_notes", []),

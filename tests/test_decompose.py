@@ -79,6 +79,15 @@ class DecompositionTests(unittest.TestCase):
         _, questions = clean_decomposition(result, Intake(problem_text=EXAMPLE, monthly_budget=30))
         self.assertEqual([q.id for q in questions], ["q2"])
 
+    def test_volume_and_seat_questions_are_not_asked_up_front(self):
+        result = Decomposition(summary="s", components=[], questions=[
+            ClarifyingQuestion(id="q1", field="monthly_volume", question="How many reservations a month?"),
+            ClarifyingQuestion(id="q2", field="editors", question="How many admins?"),
+            ClarifyingQuestion(id="q3", field="text", question="Where does your booking page live?"),
+            ClarifyingQuestion(id="q4", field="text", question="Do you take deposits?")])
+        _, questions = clean_decomposition(result, Intake(problem_text=EXAMPLE, monthly_budget=200))
+        self.assertEqual([q.id for q in questions], ["q3"])  # one question about which kind of tool, nothing else
+
     def test_apply_answers(self):
         questions = [{"id": "q_budget", "field": "monthly_budget", "question": "Budget?"},
                      {"id": "q_volume", "field": "monthly_volume", "question": "Volume?"},
@@ -87,6 +96,13 @@ class DecompositionTests(unittest.TestCase):
                                {"q_budget": "$30", "q_volume": "1,200", "q_where": "Wix"})
         self.assertEqual((intake.monthly_budget, intake.usage.monthly_volume), (30.0, 1200))
         self.assertIn("Where is your form hosted? Wix", intake.requirements)
+
+
+class EditorAnswerTests(unittest.TestCase):
+    def test_more_editors_than_team_size_raises_team_size(self):
+        q = [{"id": "q1", "field": "editors", "question": "How many people need admin access?"}]
+        intake = apply_answers(Intake(problem_text=EXAMPLE), q, {"q1": "3"})  # team size was never given
+        self.assertEqual((intake.usage.seats, intake.usage.editors), (3, 3))
 
 
 class ProviderSelectionTests(unittest.TestCase):

@@ -4,7 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, render_template, request
 from pydantic import ValidationError
 
-from .schemas import Answers, ApprovalRequest, Intake, RevisionRequest
+from .schemas import Answers, ApprovalRequest, Intake, ResearchRequest, RevisionRequest, SelectionRequest
 from .service import Conflict, NotFound
 
 bp = Blueprint("agent", __name__)
@@ -70,6 +70,31 @@ def revise(project_id):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"status": "accepted", "requirement_version": version, "run_id": run_id}), 202
+
+
+@bp.post("/api/projects/<project_id>/research")
+def research_more(project_id):
+    try:
+        body = ResearchRequest.model_validate(request.get_json(silent=True) or {})
+        run_id = service().research_more(project_id, body)
+    except ValidationError as exc:
+        return _validation_error(exc)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"status": "accepted", "run_id": run_id}), 202
+
+
+@bp.post("/api/projects/<project_id>/selection")
+def price_selection(project_id):
+    """Price the owner's picks (no saving); the page calls this as picks change."""
+    try:
+        body = SelectionRequest.model_validate(request.get_json(silent=True) or {})
+        option = service().price_selection(project_id, body.selections)
+    except ValidationError as exc:
+        return _validation_error(exc)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"option": option.model_dump()})
 
 
 @bp.post("/api/projects/<project_id>/approve")

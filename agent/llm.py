@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from .capabilities import CAPABILITIES, KEYWORDS, VOLUME_SENSITIVE
 from .schemas import (ArticleTools, ClarifyingQuestion, Component, Decomposition, ExtractedPlan, ExtractedTool,
-                      ToolMention)
+                      FitAssessment, FitAssessments, PlanLimit, ToolMention)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -35,14 +35,14 @@ class ModelClient(Protocol):
         ...
 
 
-OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano", "mine": "openai/gpt-5-nano"}
+OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano", "mine": "openai/gpt-5-nano", "fit": "openai/gpt-5-nano"}
 
 
 # Default reasoning made each extraction call take 18-32 s. "low" measured ~23 s for a whole
 # research step (3 candidates in parallel) with correct relevance; "minimal" was ~10 s but
 # tagged unrelated products with almost every capability.
 # Override with AGENT_REASONING_<TASK> (none|minimal|low|medium|high).
-REASONING_DEFAULTS = {"extract": "low", "mine": "low"}
+REASONING_DEFAULTS = {"extract": "low", "mine": "low", "fit": "low"}
 
 
 def reasoning_for(task: str) -> str | None:
@@ -118,6 +118,7 @@ class OpenRouterModel:
         )
 
 
+LIMIT_RE = re.compile(r"(\d[\d,]*)\s+(users|contacts|bookings|calls|messages|minutes|tasks)\b", re.I)
 PRICE_RE = re.compile(r"(?:US)?\$\s?(\d{1,4}(?:\.\d{1,2})?)\s*(?:USD)?\s*(?:/|per|a)\s*(?:mo\b|month)", re.I)
 
 
@@ -133,6 +134,8 @@ class StubModel:
             result = self._extract(content)
         elif schema is ArticleTools:
             result = self._mine(content)
+        elif schema is FitAssessments:
+            result = _stub_fit(content)
         else:
             raise ValueError(f"Stub model cannot produce {schema.__name__}")
         return result, ModelUsage(provider=self.name, model="stub", input_tokens=len(content) // 4,
@@ -168,10 +171,6 @@ class StubModel:
         if self._field(content, "Monthly budget") in ("", "not provided"):
             questions.append(ClarifyingQuestion(id="q_budget", field="monthly_budget",
                                                 question="What is the most you want to spend per month on new software?"))
-        if (self._field(content, "Monthly volume") in ("", "not provided")
-                and any(c.capability in VOLUME_SENSITIVE for c in components)):
-            questions.append(ClarifyingQuestion(id="q_volume", field="monthly_volume",
-                                                question="About how many new leads, contacts or form submissions do you expect each month?"))
         return Decomposition(summary=f"Found {len(components)} task(s) to evaluate for your business.",
                              components=components, questions=questions)
 
@@ -186,16 +185,36 @@ class StubModel:
         for match in PRICE_RE.finditer(text):
             start = max(0, match.start() - 40)
             quote = text[start:match.end()].strip()
+            # Limits stated right after the price, e.g. "$29/month for up to 300 bookings".
+            limits = []
+            for lm in LIMIT_RE.finditer(text[match.end():match.end() + 120]):
+                limits.append(PlanLimit(kind=lm.group(2).lower(), amount=int(lm.group(1).replace(",", "")),
+                                        quote=lm.group(0)))
             plans.append(ExtractedPlan(name=f"Plan {len(plans) + 1}", monthly_price=float(match.group(1)),
-                                       per_seat=False, billing="monthly", price_quote=quote))
+                                       per_seat=False, billing="monthly", price_quote=quote, limits=limits))
             if len(plans) == 3:
                 break
         description = " ".join(text.split()[:20])
         enterprise = bool(re.search(r"\benterprise(s)? only\b|for large enterprises", text, re.I))
         return ExtractedTool(is_vendor_product_page=bool(caps) or fits, fits_need=fits, name=name, capabilities=caps,
+                             fit="built_for_this" if fits else "workable",
+                             fit_reason="Matches the need described." if fits else "Covers the need, but was made for something broader.",
                              small_business_fit=not enterprise, audience="enterprises" if enterprise else "small businesses",
                              setup_complexity="developer" if re.search(r"\bAPI\b|SDK|developers?", text) else "unknown",
                              description_quote=description, plans=plans, api_available=None, api_quote="")
+
+
+def _stub_fit(content):
+    """Offline stand-in: a product whose description names the business type is built for it."""
+    business = (re.search(r"^Business type: (.*)$", content, re.M) or [None, ""])[1].lower()
+    out = []
+    for key, rest in re.findall(r"^\[(\w+)\] (.*)$", content, re.M):
+        product = rest.split("| Product:", 1)[-1].lower()
+        built = bool(business) and business in product
+        out.append(FitAssessment(key=key, fit="built_for_this" if built else "workable",
+                                 reason=("Made for " + business + " businesses.") if built
+                                 else "General-purpose tool; check it suits this kind of business."))
+    return FitAssessments(assessments=out)
 
 
 def _stub_mine(content):

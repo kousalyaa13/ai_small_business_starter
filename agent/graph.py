@@ -16,10 +16,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from . import catalog as catalog_mod
+from . import fit as fit_mod
 from .budget import Limits, Meter
 from .decompose import DECOMPOSE_INSTRUCTIONS, apply_answers, clean_decomposition, intake_prompt
-from .options import build_options
-from .research import Researcher, SearchClient
+from .options import build_options, pricing_questions
+from .research import Researcher, SearchClient, base_host
 from .schemas import Candidate, Component, Decomposition, Intake, PlanVersion
 from .store import now_iso
 
@@ -39,6 +40,9 @@ class AgentState(TypedDict, total=False):
     plan_id: str
     plan_version: int
     approval_id: str
+    force_research: list[str]  # part ids the user asked to search again
+    pricing_questions: list[dict]  # asked after research, only if a shown plan's price depends on them
+    research_goal: str  # "cheaper", "better" or "both"
 
 
 @dataclass
@@ -68,7 +72,12 @@ def build_graph(deps: Deps, checkpointer):
     def validate_intake(state):
         store.update_snapshot(state["run_id"], step="understanding")
         intake_of(state)  # raises if stored intake is invalid
+        if state.get("components"):  # follow-up run: show the reused parts straight away
+            store.update_snapshot(state["run_id"], summary=state.get("summary", ""), components=state["components"])
         return {"clarification_round": state.get("clarification_round", 0)}
+
+    def after_validate(state):
+        return "match_catalog" if state.get("components") else "decompose"
 
     def decompose(state):
         intake = intake_of(state)
@@ -111,13 +120,33 @@ def build_graph(deps: Deps, checkpointer):
             if known:
                 notes.append(f"Reused {len(known)} tool(s) found by earlier web research for '{comp.description}'.")
             candidates[comp.id] = [c.model_dump() for c in found]
-            if not vetted and len(known) < deps.min_alternatives:
+            forced = comp.id in state.get("force_research", [])
+            if forced or (not vetted and len(known) < deps.min_alternatives):
                 gaps.append(comp.id)
+        # Rate known tools' purpose now (one batched, cached call), so coverage means fit, not just category.
+        candidates, fit_notes = fit_mod.assess(meter(state), deps.model, store, intake, state["components"], candidates)
+        notes.extend(fit_notes)
+        for comp in state["components"]:
+            cands = candidates.get(comp["id"], [])
+            # A need counts as covered only if some tool is built for that job in this kind of business;
+            # connectors are excluded because general-purpose automation tools are fine there.
+            if (comp["id"] not in gaps and cands and comp["capability"] != "workflow_automation"
+                    and not any(c.get("fit") == "built_for_this" for c in cands)):
+                gaps.append(comp["id"])
+                notes.append(f"Searching for tools made for '{comp['description']}': the known ones weren't built for it.")
         store.update_snapshot(state["run_id"], candidates=candidates, gaps=gaps, research_notes=notes)
         return {"candidates": candidates, "gaps": gaps, "research_notes": notes}
 
     def after_match(state):
-        return "research_gaps" if state.get("gaps") else "build_options"
+        return "research_gaps" if state.get("gaps") else "assess_fit"
+
+    def assess_fit_node(state):
+        """Rate each tool's purpose against each need for this business type (cached; one batched call)."""
+        store.update_snapshot(state["run_id"], step="building_options")
+        candidates, notes = fit_mod.assess(meter(state), deps.model, store, intake_of(state),
+                                           state["components"], {k: [dict(c) for c in v] for k, v in state["candidates"].items()})
+        store.update_snapshot(state["run_id"], candidates=candidates)
+        return {"candidates": candidates, "research_notes": notes}
 
     def research_gaps(state):
         store.update_snapshot(state["run_id"], step="researching")
@@ -125,8 +154,19 @@ def build_graph(deps: Deps, checkpointer):
         researcher = Researcher(store, meter(state), deps.model, deps.search, deps.fetcher, deps.load_catalog())
         candidates, notes = dict(state["candidates"]), []
         comps = {c["id"]: Component.model_validate(c) for c in state["components"]}
+        forced, goal = set(state.get("force_research", [])), state.get("research_goal")
         for cid in state["gaps"]:
-            found, comp_notes = researcher.research(comps[cid], intake)
+            current = candidates.get(cid, [])
+            if cid in forced:
+                # Look past what's already shown: alternatives to the current tools, cheaper and better ones.
+                found, comp_notes = researcher.research(
+                    comps[cid], intake, goal=goal or "both", current_names=[c["name"] for c in current],
+                    exclude_hosts={base_host(c["site"]) for c in current if c.get("site")})
+                new = [c for c in found if c.tool_id not in {x["tool_id"] for x in current}]
+                comp_notes.append(f"Found {len(new)} new tool(s) for '{comps[cid].description}'." if new else
+                                  f"No new tools found for '{comps[cid].description}' beyond those already shown.")
+            else:
+                found, comp_notes = researcher.research(comps[cid], intake)
             # Merge with tools already known for this part; a fresh look replaces the saved copy.
             fresh = {c.tool_id: c.model_dump() for c in found}
             kept = [c for c in candidates.get(cid, []) if c["tool_id"] not in fresh]
@@ -142,7 +182,8 @@ def build_graph(deps: Deps, checkpointer):
         comps = [Component.model_validate(c) for c in state["components"]]
         cands = {cid: [Candidate.model_validate(c) for c in lst] for cid, lst in state["candidates"].items()}
         options = build_options(comps, cands, intake)
-        return {"options": [o.model_dump() for o in options]}
+        return {"options": [o.model_dump() for o in options],
+                "pricing_questions": pricing_questions(options, cands, intake)}
 
     def persist_plan(state):
         intake = intake_of(state)
@@ -152,7 +193,8 @@ def build_graph(deps: Deps, checkpointer):
             return PlanVersion(version=version, requirement_version=state["requirement_version"],
                                summary=state.get("summary", ""), monthly_budget=intake.monthly_budget,
                                usage=intake.usage, options=state["options"], gaps=gaps,
-                               research_notes=state.get("research_notes", []), created_at=now_iso()).model_dump()
+                               research_notes=state.get("research_notes", []), created_at=now_iso(),
+                               pricing_questions=state.get("pricing_questions", [])).model_dump()
 
         plan = store.persist_plan(state["project_id"], state["run_id"], state["requirement_version"], payload)
         return {"plan_id": plan["id"], "plan_version": plan["version"]}
@@ -182,17 +224,19 @@ def build_graph(deps: Deps, checkpointer):
     g = StateGraph(AgentState)
     for name, fn in [("validate_intake", validate_intake), ("decompose", decompose),
                      ("ask_clarification", ask_clarification), ("match_catalog", match_catalog),
-                     ("research_gaps", research_gaps), ("build_options", build_options_node),
+                     ("research_gaps", research_gaps), ("assess_fit", assess_fit_node),
+                     ("build_options", build_options_node),
                      ("persist_plan", persist_plan), ("no_complete_option", no_complete_option),
                      ("await_approval", await_approval),
                      ("record_approval", record_approval)]:
         g.add_node(name, fn)
     g.add_edge(START, "validate_intake")
-    g.add_edge("validate_intake", "decompose")
+    g.add_conditional_edges("validate_intake", after_validate, ["decompose", "match_catalog"])
     g.add_conditional_edges("decompose", after_decompose, ["ask_clarification", "match_catalog"])
     g.add_edge("ask_clarification", "decompose")
-    g.add_conditional_edges("match_catalog", after_match, ["research_gaps", "build_options"])
-    g.add_edge("research_gaps", "build_options")
+    g.add_conditional_edges("match_catalog", after_match, ["research_gaps", "assess_fit"])
+    g.add_edge("research_gaps", "assess_fit")
+    g.add_edge("assess_fit", "build_options")
     g.add_edge("build_options", "persist_plan")
     g.add_conditional_edges("persist_plan", after_persist, ["await_approval", "no_complete_option"])
     g.add_edge("no_complete_option", END)
