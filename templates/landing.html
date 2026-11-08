@@ -92,13 +92,15 @@
    <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
+  <div class="research-quotes-grid">
   <div class="research-quote">
    <span class="research-quote-mark" aria-hidden="true">“</span>
    <div><blockquote>“{{ content.research_quote.quote }}”</blockquote><a href="{{ content.research_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.research_quote.speaker }} · {{ content.research_quote.role }} ↗</a></div>
   </div>
+   <div class="research-quote owner-featured-quote"><span class="research-quote-mark" aria-hidden="true">“</span><div><blockquote>“{{ content.owner_quote.quote }}”</blockquote><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.owner_quote.speaker }} · {{ content.owner_quote.role }} ↗</a></div></div>
+  </div>
   <div class="research-stories" id="stories">
    <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>See what support can unlock.</h3></div></div>
-   <div class="research-quote owner-featured-quote"><span class="research-quote-mark" aria-hidden="true">“</span><div><blockquote>“{{ content.owner_quote.quote }}”</blockquote><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.owner_quote.speaker }} · {{ content.owner_quote.role }} ↗</a></div></div>
    <div class="story-video-grid research-visual-grid">
     {% for video in content.videos[:2] %}
     <article class="story-video-card">
