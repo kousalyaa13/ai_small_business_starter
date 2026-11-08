@@ -125,18 +125,19 @@
     return '<section class="product-details" id="detail-' + id + '" hidden>' +
       '<div class="detail-tabs" role="tablist" aria-label="Details for ' + escape(tools.map(t=>t.name).join(', ')) + '">' +
       ['overview','pricing','setup'].map((tab,i) => '<button type="button" role="tab" data-tab="' + tab +
+        '" id="tab-' + id + '-' + tab + '" aria-controls="panel-' + id + '-' + tab +
         '" aria-selected="' + (i===0?'true':'false') + '" tabindex="' + (i===0?'0':'-1') +
         '">' + ({overview:'Overview',pricing:'Pricing details',setup:'Setup & limits'})[tab] + '</button>').join('') +
-      '</div><div class="detail-panel" data-panel="overview"><h4>How this helps your business</h4>' +
+      '</div><div class="detail-panel" id="panel-' + id + '-overview" role="tabpanel" aria-labelledby="tab-' + id + '-overview" data-panel="overview"><h4>How this helps your business</h4>' +
       rows + '<h4>Tasks covered</h4><ul class="simple-list">' + tasks + '</ul>' +
       '<p class="detail-caution">Product features are based on catalog research and need confirmation for your specific plan.</p></div>' +
-      '<div class="detail-panel" data-panel="pricing" hidden><h4>Cost breakdown</h4>' +
+      '<div class="detail-panel" id="panel-' + id + '-pricing" role="tabpanel" aria-labelledby="tab-' + id + '-pricing" data-panel="pricing" hidden><h4>Cost breakdown</h4>' +
       costRows + '<div class="detail-price-row total-row"><span>Estimated monthly software cost</span><b>' +
       costLabel(o) + '</b></div><p class="detail-caution">Annual-plan figures are monthly equivalents, not month-to-month billing. Taxes, setup and optional add-ons are excluded.</p>' +
       '<div class="source-links">' + pricingLinks(o,tools) + '</div>' +
       (assumptions ? '<details class="extra-notes"><summary>Full pricing assumptions</summary><ul>' +
         assumptions + '</ul></details>' : '') + '</div>' +
-      '<div class="detail-panel" data-panel="setup" hidden><h4>How to get started</h4>' +
+      '<div class="detail-panel" id="panel-' + id + '-setup" role="tabpanel" aria-labelledby="tab-' + id + '-setup" data-panel="setup" hidden><h4>How to get started</h4>' +
       '<ol class="simple-list">' + setup + '</ol><p class="detail-caution">BloomBot does not buy, connect, or configure software for you. Review permissions, integrations, data handling, and features before subscribing.</p></div>' +
       '</section>';
   }
@@ -171,7 +172,9 @@
       (allVetted ? 'Reviewed catalog' : 'Verify this product') + '</span></div>' +
       hero + '<p class="result-description">' + escape(shortDesc) + '</p>' +
       '<div class="result-price ' + priceClass(o) + '"><strong>' + costLabel(o) +
-      '</strong>' + (o.total_is_complete ? '<span>/month equivalent</span>' : '') + '</div>' +
+      '</strong>' + (o.total_is_complete ? '<span>/month' +
+        (tools.length > 0 && tools.every(t => billingLabel(t.plan) === 'Annual commitment') ? ' equivalent' : '') +
+        '</span>' : '') + '</div>' +
       '<div class="result-billing">' + escape(commitment(tools)) +
       (o.total_is_complete && tools.every(t => billingLabel(t.plan) === 'Annual commitment') ?
         ' · ' + money(o.monthly_total * 12) + '/year' : '') + '</div>' +
@@ -333,6 +336,17 @@
   byId('compare-view').addEventListener('click', e => {
     const choose = e.target.closest('[data-approve]');
     if (choose && data?.plan) approve(choose.dataset.approve, data.plan.version);
+  });
+  byId('options').addEventListener('keydown', e => {
+    const tab = e.target.closest('[data-tab]');
+    if (!tab || !['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+    const tabs = [...tab.closest('[role="tablist"]').querySelectorAll('[data-tab]')];
+    const current = tabs.indexOf(tab);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 :
+      (current + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    e.preventDefault();
+    tabs[next].click();
+    tabs[next].focus();
   });
   byId('options').addEventListener('error', e => {
     if (e.target.tagName === 'IMG' && e.target.closest('.product-icon')) e.target.hidden = true;
