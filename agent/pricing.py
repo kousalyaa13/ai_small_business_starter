@@ -20,16 +20,23 @@ class PlanChoice:
     notes: list[str] = field(default_factory=list)
 
 
+def billable_seats(plan: Plan, usage: Usage) -> int:
+    """Only discount read-only users when the vendor explicitly verifies free viewers."""
+    return usage.editors if plan.free_viewers and usage.editors is not None else usage.seats
+
+
 def plan_fits(plan: Plan, usage: Usage) -> tuple[bool, list[str]]:
     """Return whether usage stays within the plan's stated limits, plus assumption notes."""
     notes = []
+    if billable_seats(plan, usage) < plan.min_seats:
+        return False, []
     for key, attr in LIMIT_TO_USAGE.items():
         limit = plan.included.get(key)
         if limit is None:
             continue
         if key == "seats" and plan.per_seat:
             continue  # per-seat plans scale with seats instead of capping them
-        needed = getattr(usage, attr)
+        needed = billable_seats(plan, usage) if key == "seats" else getattr(usage, attr)
         if needed is None:
             notes.append(f"{plan.name} includes up to {limit:,} {key.replace('_', ' ')}; your volume was not provided.")
             continue
@@ -42,7 +49,7 @@ def plan_cost(plan: Plan, usage: Usage) -> float | None:
     if plan.monthly_price is None:
         return None
     price = float(plan.monthly_price)
-    return round(price * usage.seats, 2) if plan.per_seat else round(price, 2)
+    return round(price * billable_seats(plan, usage), 2) if plan.per_seat else round(price, 2)
 
 
 def choose_plan(plans: list[Plan], usage: Usage) -> PlanChoice:
@@ -60,9 +67,13 @@ def choose_plan(plans: list[Plan], usage: Usage) -> PlanChoice:
     if priced:
         plan, notes, cost = min(priced, key=lambda item: item[2])
         basis = "per seat" if plan.per_seat else "flat"
+        paid = billable_seats(plan, usage)
         notes = [*notes, f"{plan.name}: ${plan.monthly_price:g}/month {basis}"
-                 + (f" × {usage.seats} seats" if plan.per_seat else "")
-                 + (" (billed annually)" if plan.billing == "annual" else "")]
+                 + (f" × {paid} paid editor(s)" if plan.per_seat else "")
+                 + (f"; {usage.seats - paid} read-only viewer(s) free" if plan.free_viewers and paid < usage.seats else "")
+                 + (" (annual billing commitment)" if plan.billing == "annual" else "")]
+        if plan.free_viewers and usage.editors is None and usage.seats > 1:
+            notes.append("Editor count not confirmed: price assumes all team members need paid editing access.")
         return PlanChoice(plan, cost, notes)
     if fitting:
         plan, notes = fitting[0]

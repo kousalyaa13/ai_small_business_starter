@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BloomBot AI — Describe a problem, get a tool plan</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='consult-recovery.css') }}">
 <style>
 :root{--ink:#162336;--muted:#687587;--line:#e5eaf0;--page:#f7f8f7;--blue:#345fe7;--teal:#108c78;--amber:#c37923;--violet:#6b4cbd;--red:#a62f42}
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}
@@ -46,7 +47,8 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
     <label class="field">Business name<input name="business_name" maxlength="80" placeholder="Optional"></label>
     <label class="field">Software you already use<input name="existing_software" placeholder="e.g. Wix, Google Sheets"></label>
     <label class="field">Monthly budget for new software ($)<input name="monthly_budget" type="number" min="0" step="1" placeholder="e.g. 30"></label>
-    <label class="field">People who need access<input name="seats" type="number" min="1" value="1"></label>
+    <label class="field">Total people who need access<input name="seats" type="number" min="1" max="500" placeholder="e.g. 5 (or describe above)"></label>
+     <label class="field">How many need editing access?<input name="editors" type="number" min="1" max="500" placeholder="Optional; we can ask later"></label>
     <label class="field">New leads or records per month<input name="monthly_volume" type="number" min="0" placeholder="Optional"></label>
     <label class="field">Total contacts you keep<input name="contacts" type="number" min="0" placeholder="Optional"></label>
    </div>
@@ -71,7 +73,28 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
    <span class="eyebrow" style="color:var(--teal)">Recommended options</span>
    <h2>Pick the option you want</h2>
    <p class="caption" id="plan-meta" style="margin-top:6px"></p>
-   <div class="options" id="options"></div>
+   <div id="recovery-panel" class="recovery" hidden>
+      <div class="recovery-head"><div class="recovery-symbol">✦</div><div><h3 id="recovery-title">Let's find a better fit</h3>
+      <p id="recovery-description">We'll show exactly which changes could help, without guessing prices.</p></div></div>
+      <ul class="recovery-list" id="recovery-suggestions"></ul>
+      <details id="recovery-details"><summary>What could I change? · Compare budget and access</summary>
+       <div class="recovery-grid">
+        <div class="recovery-control"><label for="editor-slider">People who need to edit</label>
+         <div class="seat-number" id="editor-count"></div><input id="editor-slider" type="range" min="1" max="5" value="3">
+         <small id="viewer-count"></small></div>
+        <div class="recovery-control"><label for="recovery-budget">Monthly software budget ($)</label>
+         <input id="recovery-budget" type="number" min="0" max="100000" step="1" value="75">
+         <small>We compare actual paid editors, free viewers and billing terms.</small></div>
+       </div>
+       <div id="recovery-prices" class="recovery-table" aria-live="polite"></div>
+       <div class="recovery-refine"><label class="field" for="recovery-problem">Clarify your business task (optional)
+        <textarea id="recovery-problem" maxlength="2000" minlength="10"></textarea></label></div>
+       <div class="recovery-actions"><button class="btn blue" type="button" id="recovery-apply">Update & find better options →</button>
+        <span class="caption">Keeps your project history; nothing is purchased.</span></div>
+       <div class="err" id="recovery-error" role="alert" hidden></div>
+      </details>
+     </div>
+     <div class="options" id="options"></div>
    <div class="submit-line" id="approve-line" style="justify-content:flex-start;gap:12px">
     <label class="field" style="max-width:280px">Maximum one-time setup budget ($)<input id="build-budget" type="number" min="0" value="0"></label>
    </div>
@@ -100,7 +123,9 @@ $('intake-form').addEventListener('submit',async e=>{
  const body={problem_text:f.get('problem_text'),business_name:f.get('business_name'),
   existing_software:String(f.get('existing_software')||'').split(',').map(s=>s.trim()).filter(Boolean),
   monthly_budget:num(f.get('monthly_budget')),
-  usage:{seats:num(f.get('seats'))||1,monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
+  usage:{monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
+ if(num(f.get('seats'))!==null)body.usage.seats=num(f.get('seats'));
+ if(num(f.get('editors'))!==null)body.usage.editors=num(f.get('editors'));
  try{const r=await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const j=await r.json();if(!r.ok)throw Error(j.error||'Could not start');
   projectId=j.project_id;history.replaceState(null,'','/consult?project='+encodeURIComponent(projectId));show();}
@@ -177,5 +202,6 @@ async function approve(optionId,version){
 }
 if(projectId)show();
 </script>
+<script src="{{ url_for('static', filename='consult-recovery.js') }}" defer></script>
 </body>
 </html>

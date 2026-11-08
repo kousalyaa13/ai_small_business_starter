@@ -1,0 +1,28 @@
+name: Test BloomBot AI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile Python
+        run: python -m compileall -q app.py agent advisor.py tests
+      - name: Run unit and API tests
+        env:
+          AGENT_PROVIDER: stub
+        run: python -m unittest discover -s tests -v
+      - name: Check recovery JavaScript syntax
+        run: node --check static/consult-recovery.js

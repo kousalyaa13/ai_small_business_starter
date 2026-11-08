@@ -12,7 +12,7 @@ from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
-from .capabilities import KEYWORDS, VOLUME_SENSITIVE
+from .capabilities import CAPABILITIES, KEYWORDS, VOLUME_SENSITIVE
 from .schemas import ClarifyingQuestion, Component, Decomposition, ExtractedPlan, ExtractedTool
 
 T = TypeVar("T", bound=BaseModel)
@@ -131,7 +131,7 @@ class StubModel:
         components = []
         constraints = ["Avoid duplicate records (match on email)"] if re.search(r"duplicat", problem) else []
         for i, cap in enumerate(found, start=1):
-            components.append(Component(id=f"c{i}", capability=cap, description=f"Handle: {cap.replace('_', ' ')}",
+            components.append(Component(id=f"c{i}", capability=cap, description=CAPABILITIES.get(cap, "Clarify this business task"),
                                         constraints=constraints if cap == "crm_contacts" else [], connects=[]))
         # "When X happens, add/send to Y" between two systems implies a connector.
         if len(components) >= 2 and re.search(r"\b(whenever|when|automatic|sync|add them|send them)\b", problem):
@@ -146,7 +146,7 @@ class StubModel:
                 and any(c.capability in VOLUME_SENSITIVE for c in components)):
             questions.append(ClarifyingQuestion(id="q_volume", field="monthly_volume",
                                                 question="About how many new leads, contacts or form submissions do you expect each month?"))
-        return Decomposition(summary=f"{len(components)} part(s) identified from your description.",
+        return Decomposition(summary=f"Found {len(components)} task(s) to evaluate for your business.",
                              components=components, questions=questions)
 
     def _extract(self, content):
