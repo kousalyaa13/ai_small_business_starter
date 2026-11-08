@@ -115,6 +115,16 @@ class CatalogAndOptionsTests(unittest.TestCase):
             self.assertNotEqual(option.title, "Vetted tools only")
         self.assertEqual(build_options([crm, calls], {"c1": cands["c1"], "c2": []}, intake), [])
 
+    def test_recommendations_include_official_product_links(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=200))
+        comps = self.decompose(EXAMPLE, monthly_budget=30).components
+        cands = {c.id: catalog.match(c, intake, self.catalog) for c in comps}
+        options = build_options(comps, cands, intake)
+        assignment = next(a for a in options[0].assignments if a.source == "catalog")
+        self.assertTrue(assignment.site_url.startswith("https://"))
+        self.assertTrue(assignment.pricing_source_url.startswith("https://"))
+        self.assertTrue(assignment.tool_description)
+
     def test_each_part_lists_the_other_tools_that_fit(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=200))
         comps = self.decompose(EXAMPLE, monthly_budget=30).components
