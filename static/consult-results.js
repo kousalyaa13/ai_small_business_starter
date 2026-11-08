@@ -198,7 +198,8 @@
     options.forEach(o => uniqueTasks(o).forEach(t => tasks.set(t.id,t.name)));
     const columns = options.map(o => groupTools(o));
     const head = options.map((o,i) => '<th scope="col"><div class="compare-product">' +
-      columns[i].map(t => '<div>' + productIcon(t) + '<b>' + escape(t.name) + '</b></div>').join('') +
+      columns[i].map(t => '<div>' + productIcon(t) + '<span><b>' + escape(t.name) +
+        '</b><small>' + escape(t.plan || 'Plan not specified') + '</small></span></div>').join('') +
       '</div></th>').join('');
     const row = (label, cells) => '<tr><th scope="row">' + escape(label) + '</th>' +
       cells.map(x => '<td>' + x + '</td>').join('') + '</tr>';
@@ -207,6 +208,8 @@
     const billing = row('Billing', columns.map(tools => escape(commitment(tools))));
     const budget = row('Budget fit', options.map(o => '<span class="' + priceClass(o) + '">' +
       escape(statusLabel(o)) + '</span>'));
+    const websites = row('Product website', columns.map(tools =>
+      tools.map(t => toolLink(t)).join('<br>')));
     const featureRows = [...tasks].map(([id,name]) => row(name, options.map(o =>
       uniqueTasks(o).some(t => t.id===id && t.covered) ?
       '<span class="compare-yes" aria-label="Included">✓ Included</span>' :
@@ -217,7 +220,7 @@
         escape(o.id) + '">Choose plan</button>' : '<span class="caption">Review plan</span>';
     }));
     return '<div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
-      head + '</tr></thead><tbody>' + price + budget + billing + featureRows + actions +
+      head + '</tr></thead><tbody>' + price + budget + billing + featureRows + websites + actions +
       '</tbody></table></div><p class="caption compare-footnote">Prices are estimates for the specified team. Verify current vendor terms, capabilities and plan limits before purchasing.</p>';
   }
 
