@@ -123,7 +123,9 @@ $('intake-form').addEventListener('submit',async e=>{
  const body={problem_text:f.get('problem_text'),business_name:f.get('business_name'),
   existing_software:String(f.get('existing_software')||'').split(',').map(s=>s.trim()).filter(Boolean),
   monthly_budget:num(f.get('monthly_budget')),
-  usage:{seats:num(f.get('seats'))||1,monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
+  usage:{monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
+ if(num(f.get('seats'))!==null)body.usage.seats=num(f.get('seats'));
+ if(num(f.get('editors'))!==null)body.usage.editors=num(f.get('editors'));
  try{const r=await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const j=await r.json();if(!r.ok)throw Error(j.error||'Could not start');
   projectId=j.project_id;history.replaceState(null,'','/consult?project='+encodeURIComponent(projectId));show();}
@@ -200,5 +202,6 @@ async function approve(optionId,version){
 }
 if(projectId)show();
 </script>
+<script src="{{ url_for('static', filename='consult-recovery.js') }}" defer></script>
 </body>
 </html>
