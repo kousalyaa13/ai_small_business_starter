@@ -98,7 +98,9 @@ def build_option(option_id, title, summary, components, picks, intake: Intake, c
             assignments.append(Assignment(component_id=comp.id, capability=comp.capability, description=comp.description,
                                           tool_id=native.tool_id, tool_name=f"Built into {native.name}", source="native",
                                           vetted=native.vetted, monthly_cost=0.0,
-                                          cost_basis="No separate connector needed: both steps happen in the same tool."))
+                                          cost_basis="No separate connector needed: both steps happen in the same tool.",
+                                          site_url=native.site, pricing_source_url=native.pricing_source_url,
+                                          pricing_checked_at=native.pricing_checked_at, tool_description=native.description))
             continue
         if cand is None:
             assignments.append(Assignment(component_id=comp.id, capability=comp.capability, description=comp.description,
@@ -135,7 +137,10 @@ def build_option(option_id, title, summary, components, picks, intake: Intake, c
             tool_id=cand.tool_id, tool_name=cand.name,
             source="owned" if _covered_by_owned(cand) else cand.source, vetted=cand.vetted, plan_name=plan_name,
             monthly_cost=cost if tool_costs[cand.tool_id] is not None else None, cost_basis=basis,
-            source_url=cand.pricing_source_url or cand.site, setup_complexity=cand.setup_complexity,
+            source_url=cand.pricing_source_url or cand.site,
+            site_url=cand.site, pricing_source_url=cand.pricing_source_url,
+            pricing_checked_at=cand.pricing_checked_at, tool_description=cand.description,
+            setup_complexity=cand.setup_complexity,
             best_for=cand.best_for or cand.audience,
             alternatives=alternatives_for(comp, cand.tool_id, cands_by or {}, intake)))
 
