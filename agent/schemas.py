@@ -44,12 +44,12 @@ class Intake(BaseModel):
         data = dict(value)
         text = str(data.get("problem_text") or "")
         if data.get("monthly_budget") is None:
-            m = re.search(r"\\b(?:monthly\\s+budget|budget\\s+(?:of|is|:))\\s*\\$?([\\d,]+(?:\\.\\d+)?)\\s*(?:per\\s+month|/month|monthly|mo\\b)", text, re.I)
+            m = re.search(r"\b(?:monthly\s+budget|budget\s+(?:of|is|:))\s*\$?([\d,]+(?:\.\d+)?)\s*(?:per\s+month|/month|monthly|mo\b)", text, re.I)
             if m:
                 data["monthly_budget"] = float(m.group(1).replace(",", ""))
         usage = dict(data.get("usage") or {})
         if usage.get("seats") is None:
-            m = re.search(r"\\b(\\d{1,3})\\s+(?:people|users|employees|staff|team members)\\s+(?:need|will|who|to|have)\\b", text, re.I)
+            m = re.search(r"\b(\d{1,3})\s+(?:people|users|employees|staff|team members)\s+(?:need|will|who|to|have)\b", text, re.I)
             if m:
                 usage["seats"] = int(m.group(1))
         data["usage"] = usage
