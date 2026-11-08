@@ -177,3 +177,15 @@
 .compare-initial{display:inline-grid;place-items:center;width:24px;height:24px;color:#7546c8;font-weight:850;background:#f2e9fc;border-radius:6px}
 .compare-table thead th>span:last-child{vertical-align:middle}
 @media(max-width:700px){.compare-intro{align-items:flex-start}.compare-table{min-width:610px}}
+
+/* Comparison-first selection: complete information without duplicate product cards. */
+.compare-site{color:#342445;text-decoration:none;font-weight:850}
+.compare-site:hover{text-decoration:underline;color:#7546c8}
+.compare-plan{display:block;margin-top:4px;color:#758197;font-size:11px;font-weight:500}
+.compare-reason-row td{background:#f2faf6;color:#225e4e;line-height:1.55}
+.compare-reason-row td strong{color:#116c52}
+.compare-action-row td{background:#fff;vertical-align:bottom;padding-top:18px;padding-bottom:20px}
+.compare-pick{width:100%;min-width:90px}
+.compare-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;color:#675c76;font-size:12px;font-weight:750;border-top:1px solid #eee8f3}
+.compare-pagination>div{display:flex;gap:8px}
+.compare-pagination .nav-btn{min-width:35px}
