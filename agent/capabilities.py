@@ -17,13 +17,18 @@ CAPABILITIES = {
     "website_builder": "Build and host a business website",
     "online_store": "Sell products online",
     "ai_content": "Generate marketing copy, images or other content with AI",
+    "budget_planning": "Develop a budget for each fiscal year",
+    "budget_tracking": "Track spending and actuals against an approved budget",
+    "financial_reporting": "Share budget summaries and fiscal-year reports",
+    "budget_approvals": "Review and approve proposed budgets",
     "other": "A need that does not fit any category above",
 }
 
 Capability = Literal[
     "form_capture", "crm_contacts", "email_marketing", "appointment_booking",
     "invoicing", "support_chat", "social_scheduling", "workflow_automation",
-    "website_builder", "online_store", "ai_content", "other",
+    "website_builder", "online_store", "ai_content", "budget_planning",
+    "budget_tracking", "financial_reporting", "budget_approvals", "other",
 ]
 
 # Capabilities whose plan limits usually depend on contact or event volume.
@@ -41,4 +46,8 @@ KEYWORDS = {
     "website_builder": ["website", "web site", "landing page", "online presence", "seo"],
     "online_store": ["online store", "sell online", "ecommerce", "e-commerce", "shop"],
     "ai_content": ["generate", "copy", "content", "design", "graphics", "write"],
+    "budget_planning": ["budget development", "budget planning", "annual budget", "fiscal year", "fiscal-year", "create a budget", "develop my budget", "prepare budgets"],
+    "budget_tracking": ["budget tracking", "budget development and tracking", "tracking every fiscal year", "tracking budgets", "track my budget", "track our budget", "budget versus actual", "budget vs actual", "spending against budget"],
+    "financial_reporting": ["budget report", "fiscal reporting", "financial report", "variance report", "budget variance"],
+    "budget_approvals": ["budget approval", "approve budgets", "approve the budget", "budget signoff", "budget sign-off"],
 }

@@ -1,17 +1,25 @@
 """Structured records passed between the API, the graph and the model."""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .capabilities import Capability
 
 
 class Usage(BaseModel):
-    seats: int = Field(1, ge=1, le=500)
+    seats: int = Field(1, ge=1, le=500)  # total people needing access
+    editors: int | None = Field(None, ge=1, le=500)  # paid editors; remaining people are read-only
     contacts: int | None = Field(None, ge=0, le=10_000_000)
     monthly_volume: int | None = Field(None, ge=0, le=10_000_000)
+
+    @model_validator(mode="after")
+    def editors_within_team(self):
+        if self.editors is not None and self.editors > self.seats:
+            raise ValueError("Editors cannot exceed the number of people needing access.")
+        return self
 
 
 class Intake(BaseModel):
@@ -25,6 +33,29 @@ class Intake(BaseModel):
     usage: Usage = Field(default_factory=Usage)
     requirements: list[str] = Field(default_factory=list, max_length=30)
 
+    @model_validator(mode="before")
+    @classmethod
+    def explicit_numbers_in_description(cls, value):
+        """Read clearly stated numbers only when dedicated fields are empty.
+
+        Do not overwrite explicit form entries or infer editor permissions.
+        """
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        text = str(data.get("problem_text") or "")
+        if data.get("monthly_budget") is None:
+            m = re.search(r"\b(?:monthly\s+budget|budget\s+(?:of|is|:))\s*\$?([\d,]+(?:\.\d+)?)\s*(?:per\s+month|/month|monthly|mo\b)", text, re.I)
+            if m:
+                data["monthly_budget"] = float(m.group(1).replace(",", ""))
+        usage = dict(data.get("usage") or {})
+        if usage.get("seats") is None:
+            m = re.search(r"\b(\d{1,3})\s+(?:people|users|employees|staff|team members)\s+(?:need|will|who|to|have)\b", text, re.I)
+            if m:
+                usage["seats"] = int(m.group(1))
+        data["usage"] = usage
+        return data
+
     @field_validator("existing_software", "requirements")
     @classmethod
     def _clean(cls, values):
@@ -36,7 +67,7 @@ class Intake(BaseModel):
 class ClarifyingQuestion(BaseModel):
     id: str
     question: str
-    field: Literal["monthly_budget", "monthly_volume", "contacts", "seats", "text"]
+    field: Literal["monthly_budget", "monthly_volume", "contacts", "seats", "editors", "text"]
 
 
 class Component(BaseModel):
@@ -96,6 +127,8 @@ class Plan(BaseModel):
     monthly_price: float | None = None
     billing: str = "unknown"
     per_seat: bool = False
+    free_viewers: bool = False  # verified read-only access does not consume paid seats
+    min_seats: int = Field(1, ge=1, le=500)  # minimum paid members for this plan
     included: dict[str, int | None] = Field(default_factory=dict)
     evidence: str = ""
 
@@ -174,6 +207,14 @@ class PlanVersion(BaseModel):
 
 class Answers(BaseModel):
     answers: dict[str, str] = Field(max_length=10)
+
+
+class RevisionRequest(BaseModel):
+    """Adjust assumptions without losing the original consultation or its plan history."""
+    monthly_budget: float | None = Field(None, ge=0, le=100_000)
+    seats: int | None = Field(None, ge=1, le=500)
+    editors: int | None = Field(None, ge=1, le=500)
+    problem_text: str | None = Field(None, min_length=10, max_length=2000)
 
 
 class ApprovalRequest(BaseModel):
