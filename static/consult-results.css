@@ -134,3 +134,8 @@
 .tool-fit{grid-column:2;font-size:12px;line-height:1.4;border-radius:8px;padding:5px 8px}
 .tool-fit.fit-good{background:#eaf7f1;color:#155c45}.tool-fit.fit-ok{background:#fff6e5;color:#7a5418}
 .tool-fit.fit-poor{background:#fdeeed;color:#8f2a1b}
+
+/* Concise needs checklist: no research-origin badges or raw goal paragraph. */
+.consultation-status .need-row{display:flex;align-items:center;gap:12px}
+.consultation-status .need-row>span:last-child{flex:1;min-width:0}
+.consultation-status .need-check{flex:none}
