@@ -40,7 +40,20 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
 .btn.blue{background:#7546c8}.btn.blue:hover{background:#6135b1}
 .choice input:checked+span{background:#f4eaff;color:#603a93;border-color:#8c58bd}
 input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline-color:#9d64c5}
-</style></head>
+</style>
+<style>
+/* Friendly progress indicator: visible only while the consultation is running. */
+.bloom-loading{margin:18px 0 6px;padding:14px 18px 10px;border:1px solid #eadcf4;border-radius:16px;background:linear-gradient(110deg,#fffaff,#f5edff);overflow:hidden}
+.bloom-loading-track{height:64px;position:relative;border-bottom:2px dashed #d9c1ed}
+.bloom-loading-track img{position:absolute;left:0;bottom:2px;width:55px;height:55px;object-fit:contain;animation:bloom-run 5s ease-in-out infinite alternate,bloom-hop .36s ease-in-out infinite alternate;filter:drop-shadow(0 4px 5px #8d6aaa33)}
+.bloom-loading-caption{text-align:center;font-size:12px;font-weight:750;color:#7850a2;margin-top:9px}
+.bloom-loading-dots{display:inline-block;letter-spacing:2px;animation:bloom-dots 1.2s ease-in-out infinite}
+@keyframes bloom-run{from{left:0}to{left:calc(100% - 55px)}}
+@keyframes bloom-hop{from{transform:translateY(0) rotate(-6deg)}to{transform:translateY(-9px) rotate(6deg)}}
+@keyframes bloom-dots{50%{opacity:.2}}
+@media(prefers-reduced-motion:reduce){.bloom-loading-track img,.bloom-loading-dots{animation:none!important}.bloom-loading-track img{left:calc(50% - 27px)}}
+</style>
+</head>
 <body>
 <header class="top">
  <a class="logo" href="/"><img class="logo-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"> BloomBots<span>.</span></a>
@@ -76,6 +89,10 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
    <div class="steps" id="steps"></div>
    <p class="caption" id="run-status" aria-live="polite"></p>
    <div id="run-error" class="err" role="alert" hidden></div>
+   <div id="bloom-loading" class="bloom-loading" role="status" aria-label="BloomBot is working on your growth plan" hidden>
+    <div class="bloom-loading-track" aria-hidden="true"><img src="{{ url_for('static', filename='sproutbot.svg') }}" alt=""></div>
+    <p class="bloom-loading-caption">BloomBot is exploring your options<span class="bloom-loading-dots" aria-hidden="true">...</span></p>
+   </div>
    <form id="questions" hidden></form>
    <details id="needs-details" class="needs-details"><summary id="needs-summary">What we understood</summary><div class="components" id="components"></div></details>
    <ul class="notes" id="notes" hidden></ul>
@@ -180,11 +197,13 @@ async function poll(){
  try{const r=await fetch('/api/projects/'+encodeURIComponent(projectId));const j=await r.json();
   if(!r.ok)throw Error(j.error||'Could not load project');data=j;render();
   if(['queued','running'].includes(j.run?.status))timer=setTimeout(poll,1500);}
- catch(err){$('run-error').hidden=false;$('run-error').textContent=err.message}
+ catch(err){$('bloom-loading').hidden=true;$('run-error').hidden=false;$('run-error').textContent=err.message}
 }
 
 function render(){
  const run=data.run||{},step=run.step;
+ // Pause the running mascot whenever questions or a decision need user input.
+ $('bloom-loading').hidden = !(['queued','running'].includes(run.status) && !(data.questions||[]).length);
  $('summary').textContent=data.summary||'Understanding your problem…';
  const idx=STEPS.findIndex(s=>s[0]===step);
  $('steps').innerHTML=STEPS.map((s,i)=>`<span class="step ${i<idx||run.status==='completed'?'done':i===idx?'now':''}">${esc(s[1])}</span>`).join('');
