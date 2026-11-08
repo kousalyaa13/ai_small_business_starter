@@ -1,4 +1,5 @@
 import io
+import html
 import unittest
 import app as project
 
@@ -10,23 +11,19 @@ class AppTests(unittest.TestCase):
         r = self.client.get('/')
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'BloomBot', r.data)
-        self.assertIn(b'id="challenge-form"', r.data)
-        self.assertIn(b"What's holding back", r.data)
-        self.assertIn(b'/consult?industry=', r.data)
+        self.assertIn(b'id="growth-plan-form"', r.data)
+        self.assertIn(b"What's slowing you down", r.data)
         self.assertNotIn(b'fake testimonial', r.data.lower())
 
-    def test_landing_has_five_intentional_sections(self):
+    def test_landing_sections_have_expected_order(self):
         page = self.client.get('/').get_data(as_text=True)
-        order = ['id="industries"', 'id="challenges"', 'id="approach"',
+        order = ['id="industries"', 'id="approach"',
                  'id="solutions"', 'id="research"', 'id="stories"',
-                 'id="about"', 'id="trust"']
+                 'id="about"']
         positions = [page.index(anchor) for anchor in order]
         self.assertEqual(positions, sorted(positions))
-        self.assertEqual(page.count('class="section reveal '), 5)
-        self.assertIn('href="/consult?industry=', page)
-        self.assertIn('href="/solutions#', page)
+        self.assertIn('href="#solutions"', page)
         self.assertIn('source_url', project.landing_content()['stats'][0])
-        self.assertIn('Independent research and perspectives, not endorsements of BloomBots.', page)
 
     def test_embedded_ted_talks_stay_in_research_container(self):
         page = self.client.get('/').get_data(as_text=True)
@@ -37,14 +34,12 @@ class AppTests(unittest.TestCase):
         self.assertIn('loading="lazy"', research)
         self.assertIn('Watch on TED', research)
         self.assertIn('rel="noopener noreferrer"', research)
-        self.assertIn('id="trust"', page)
-        self.assertIn('class="about-values" id="trust"', page)
 
     def test_compact_sections_share_centered_containers(self):
         page = self.client.get('/').get_data(as_text=True)
         approach = page.split('id="approach"', 1)[1].split('id="research"', 1)[0]
         research = page.split('id="research"', 1)[1].split('id="about"', 1)[0]
-        self.assertIn('class="container solution-grid"', approach)
+        self.assertIn('class="container growth-journey"', approach)
         self.assertIn('class="toolkit-inline" id="solutions"', approach)
         self.assertNotIn('</div>\n<div class="toolkit-inline"', approach)
         self.assertIn('class="research-stories" id="stories"', research)
@@ -64,14 +59,25 @@ class AppTests(unittest.TestCase):
         self.assertIn('surveyed Goldman Sachs small-business program participants', research)
         for name in ('research_quote', 'owner_quote'):
             quote = data[name]
-            self.assertIn(quote['quote'], research)
-            self.assertIn(quote['speaker'], research)
+            self.assertIn(html.escape(quote['quote']), research)
+            self.assertIn(html.escape(quote['speaker']), research)
+            self.assertIn(html.escape(quote['role']).replace('&#x27;', '&#39;'), research)
             self.assertIn(quote['source_url'], research)
-        self.assertIn('Pizza puts AI to work', research)  # apostrophe is HTML-escaped by Jinja
+        self.assertIn(html.escape("How Andy's Pizza puts AI to work").replace('&#x27;', '&#39;'), research)
         self.assertIn(data['case_study']['source_url'], research)
-        self.assertIn('Independent research and perspectives, not endorsements', research)
         self.assertEqual(research.count('<iframe '), 2)
-        self.assertEqual(page.count('class="section reveal '), 5)
+        self.assertEqual(page.count('class="section reveal '), 4)
+
+    def test_dashboard_capabilities_are_on_homepage(self):
+        page = self.client.get('/').get_data(as_text=True)
+        self.assertIn('These six capabilities are available through the BloomBots AI dashboard', page)
+        self.assertIn('href="/dashboard"', page)
+        self.assertIn('href="/consult"', page)
+        self.assertNotIn('href="/solutions"', page)
+        for service in project.landing_content()['services']:
+            with self.subTest(service=service['id']):
+                self.assertIn(html.escape(service['title']), page)
+                self.assertIn(html.escape(service['description']), page)
 
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
@@ -82,35 +88,14 @@ class AppTests(unittest.TestCase):
 
     def test_solutions(self):
         r = self.client.get('/solutions')
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b'Cost &amp; value planning', r.data)
-        self.assertIn(b'What does', r.data)
-        self.assertIn(b'id="verification"', r.data)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers['Location'], '/#solutions')
 
     def test_consult_landing_context(self):
         r = self.client.get('/consult?challenge=finance&industry=restaurant')
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'suggestedProblems', r.data)
         self.assertIn(b'landingContext', r.data)
-
-    def test_industry_cards_prefill_relevant_problems(self):
-        response = self.client.get('/consult?industry=restaurant')
-        self.assertEqual(response.status_code, 200)
-        page = response.get_data(as_text=True)
-        expected = {
-            'restaurant': ('restaurant or café', 'reservations, staff schedules'),
-            'retail': ('retail shop or boutique', 'keeping inventory accurate'),
-            'services': ('professional services business', 'collecting new client details'),
-            'hvac': ('home services business', 'schedule technicians'),
-            'landscaping': ('landscaping business', 'coordinate crew schedules'),
-            'other': ('small business', 'repetitive tasks'),
-        }
-        for industry, (business_type, problem_fragment) in expected.items():
-            with self.subTest(industry=industry):
-                self.assertIn(f"{industry}:{{type:'{business_type}'", page)
-                self.assertIn(problem_fragment, page)
-        self.assertIn("if(!challenge||!Object.hasOwn(suggestedProblems,challenge))", page)
-        self.assertIn('example.problem;', page)
 
     def test_bloombots_brand_and_about(self):
         response = self.client.get('/')
@@ -122,16 +107,13 @@ class AppTests(unittest.TestCase):
         self.assertIn('SproutBot', page)
         self.assertIn('sproutbot.svg', page)
         self.assertIn('two students who built BloomBots at a hackathon', page)
-        self.assertIn('id="challenge-form"', page)
-        self.assertIn('href="/consult?industry=', page)
+        self.assertIn('id="growth-plan-form"', page)
         self.assertIn('source_url', project.landing_content()['stats'][0])
 
     def test_bloombots_solutions_brand(self):
         response = self.client.get('/solutions')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'BloomBots', response.data)
-        self.assertIn(b'sproutbot.svg', response.data)
-        self.assertIn(b'id="verification"', response.data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/#solutions')
 
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})

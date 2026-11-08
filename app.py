@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 import pandas as pd
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request
 from advisor import assess, audit, blueprint, reviews_for
 from agent.api import bp as agent_bp
 from agent.pricing import choose_plan
@@ -154,7 +154,8 @@ def landing_content():
 
 @app.get("/solutions")
 def solutions():
-    return render_template("solutions.html", content=landing_content(), year=date.today().year)
+    # Preserve old bookmarks while keeping the capabilities on the homepage.
+    return redirect("/#solutions", code=302)
 
 
 @app.get("/dashboard")
