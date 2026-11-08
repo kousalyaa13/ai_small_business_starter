@@ -40,6 +40,17 @@ class AppTests(unittest.TestCase):
         self.assertIn('id="trust"', page)
         self.assertIn('class="container trust-wrap"', page)
 
+    def test_compact_sections_share_centered_containers(self):
+        page = self.client.get('/').get_data(as_text=True)
+        approach = page.split('id="approach"', 1)[1].split('id="research"', 1)[0]
+        research = page.split('id="research"', 1)[1].split('id="about"', 1)[0]
+        self.assertIn('class="container solution-grid"', approach)
+        self.assertIn('class="toolkit-inline" id="solutions"', approach)
+        self.assertNotIn('</div>\n<div class="toolkit-inline"', approach)
+        self.assertIn('class="research-stories" id="stories"', research)
+        self.assertNotIn('</div>\n  <div class="research-stories"', research)
+        self.assertEqual(research.count('<iframe '), 2)
+
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
         self.assertEqual(r.status_code, 200)
