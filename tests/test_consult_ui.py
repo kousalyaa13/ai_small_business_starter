@@ -27,6 +27,9 @@ class ConsultationLayoutTests(unittest.TestCase):
         self.assertIn("pricingLinks", js)
         self.assertIn("groupTools", js)
         self.assertNotIn("other tool fit this part", js.lower())
+        html = (ROOT / "templates" / "consult.html").read_text()
+        self.assertNotIn("altList(", html)
+        self.assertNotIn("other tool fit this part", html.lower())
 
 
 if __name__ == "__main__":
