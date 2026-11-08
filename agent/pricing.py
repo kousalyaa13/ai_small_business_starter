@@ -28,6 +28,8 @@ def billable_seats(plan: Plan, usage: Usage) -> int:
 def plan_fits(plan: Plan, usage: Usage) -> tuple[bool, list[str]]:
     """Return whether usage stays within the plan's stated limits, plus assumption notes."""
     notes = []
+    if billable_seats(plan, usage) < plan.min_seats:
+        return False, []
     for key, attr in LIMIT_TO_USAGE.items():
         limit = plan.included.get(key)
         if limit is None:
