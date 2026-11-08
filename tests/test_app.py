@@ -11,9 +11,22 @@ class AppTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b'BloomBot', r.data)
         self.assertIn(b'id="challenge-form"', r.data)
-        self.assertIn(b"What's getting in the way", r.data)
+        self.assertIn(b"What's holding back", r.data)
         self.assertIn(b'/consult?challenge=', r.data)
         self.assertNotIn(b'fake testimonial', r.data.lower())
+
+    def test_landing_has_five_intentional_sections(self):
+        page = self.client.get('/').get_data(as_text=True)
+        order = ['id="industries"', 'id="challenges"', 'id="approach"',
+                 'id="solutions"', 'id="research"', 'id="stories"',
+                 'id="about"', 'id="trust"']
+        positions = [page.index(anchor) for anchor in order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(page.count('class="section reveal '), 5)
+        self.assertIn('href="/consult?industry=', page)
+        self.assertIn('href="/solutions#', page)
+        self.assertIn('source_url', project.landing_content()['stats'][0])
+        self.assertIn('not BloomBots testimonials or endorsements', page)
 
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
