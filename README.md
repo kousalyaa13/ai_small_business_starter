@@ -54,6 +54,30 @@ Describe a business problem in plain English. The agent:
 
 Nothing is purchased, connected or deployed in this milestone.
 
+## Product-first consultation interface (November 2026)
+
+The `/consult` results page is now designed for nontechnical business owners:
+
+- A compact **recommendations ready** summary replaces the seven progress chips after the run finishes. Identified tasks are available in a single optional disclosure.
+- Each recommendation is a **product-first card** with a prominent vendor name, recognizable site icon, plan, total price, billing commitment, task coverage, and **Visit website** link. Site icons are loaded from the public Google favicon service using the vendor's HTTPS domain; a letter fallback is shown if an icon is unavailable.
+- Tasks fulfilled by the **same product appear once** under that product. Included capabilities do not add duplicate charges. Bundled options show distinct products separately.
+- **Compare tools** switches to a consistent side-by-side table; the old per-task "other tool fits this part" links are removed from the customer-facing view.
+- **View details** reveals three concise tabs: Overview, Pricing details (with sources and full assumptions), and Setup & limits. Setup budget remains optional and collapsed.
+- **Adjust budget or team size** opens the existing recovery calculator only when requested, unless no viable match exists. Nothing is purchased; **Choose this tool** saves the plan selection.
+
+The pricing and suitability logic remains server-side and unchanged by this visual redesign. The added `Assignment` metadata exposes the vendor website, pricing source, checked date and description to the UI. Existing saved plans lacking these optional fields still render with a letter fallback and available source links.
+
+### UI verification
+
+```bash
+python -m unittest discover -s tests -v
+node --check static/consult-results.js
+node --check static/consult-recovery.js
+node tests/test_consult_results.js
+```
+
+Manually test `/consult` at desktop and mobile widths with (1) one tool covering multiple tasks, (2) a two-tool combination, (3) a request with no match, (4) budget/editor adjustments, and (5) an approved plan. Product icons require an internet connection and may be blocked by privacy settings; vendor names and links remain available.
+
 ### Budget and seat-mix recovery (November 2026)
 
 The consultation now recognizes fiscal-year **budget development, budget tracking,
