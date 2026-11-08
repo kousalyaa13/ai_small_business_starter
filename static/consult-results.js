@@ -303,11 +303,17 @@
       return '<div class="research-result" role="status">Search finished: no new tools beyond the ones already listed. ' +
         'Your current choice still looks like a good fit. <button type="button" class="link-btn" data-dismiss-search>Dismiss</button></div>';
     }
-    const cheaper = found.filter(t => t.monthly_cost != null && current?.monthly_cost != null && t.monthly_cost < current.monthly_cost);
-    return '<div class="research-result" role="status"><b>Search finished: ' + found.length + ' new tool' +
-      (found.length === 1 ? '' : 's') + ' found</b> — ' + escape(found.map(t => t.name + ' (' + priceText(t) + ')').join(', ')) +
-      (cheaper.length ? '. Cheaper than your pick: ' + escape(cheaper.map(t => t.name).join(', ')) : '') +
-      '. They are shown first in the carousel. <button type="button" class="link-btn" data-dismiss-search>Dismiss</button></div>';
+    const names = found.map(t => t.name);
+    const namesText = names.length === 1 ? names[0] : names.length === 2 ? names.join(' and ') : names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+    const freeCount = found.filter(t => t.monthly_cost === 0).length;
+    const freeNote = freeCount === found.length
+      ? (found.length === 1 ? ' offers a free plan.' : ' both offer free plans.')
+      : (freeCount ? ' includes ' + freeCount + ' option' + (freeCount === 1 ? '' : 's') + ' with a free plan.' : '.');
+    return '<div class="research-result" role="status"><b>BloomBot found ' + found.length + ' more option' +
+      (found.length === 1 ? '!' : 's!') + '</b> ' + escape(namesText) + escape(freeNote) +
+      ' We’ve added ' + (found.length === 1 ? 'it' : 'them') + ' to your comparison so you can see how ' +
+      (found.length === 1 ? 'it stacks' : 'they stack') + ' up against your current choice. ' +
+      '<span class="caption">New options appear first.</span> <button type="button" class="link-btn" data-dismiss-search>Got it</button></div>';
   }
 
   function searchControl(need, canEdit, native) {
