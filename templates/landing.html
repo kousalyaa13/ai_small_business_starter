@@ -109,16 +109,24 @@
    <div><blockquote>“{{ content.research_quote.quote }}”</blockquote><a href="{{ content.research_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.research_quote.speaker }} · {{ content.research_quote.role }} ↗</a></div>
   </div>
   <div class="research-stories" id="stories">
-   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>See what support can unlock.</h3></div><blockquote class="owner-quote">“{{ content.owner_quote.quote }}”<cite><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.owner_quote.speaker }} · {{ content.owner_quote.role }} ↗</a></cite></blockquote></div>
-   <div class="story-video-grid">
+   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>See what support can unlock.</h3></div></div>
+   <div class="research-quote owner-featured-quote"><span class="research-quote-mark" aria-hidden="true">“</span><div><blockquote>“{{ content.owner_quote.quote }}”</blockquote><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.owner_quote.speaker }} · {{ content.owner_quote.role }} ↗</a></div></div>
+   <div class="story-video-grid research-visual-grid">
     {% for video in content.videos[:2] %}
     <article class="story-video-card">
      <div class="story-video-frame"><iframe src="https://embed.ted.com/talks/{{ video.url.rsplit('/', 1)[-1] }}" title="{{ video.title }} — {{ video.speaker }}" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
-     <div class="story-video-info"><span>{{ video.speaker }}</span><h4>{{ video.title }}</h4><a href="{{ video.url }}" target="_blank" rel="noopener noreferrer">Watch on TED ↗</a></div>
+     <div class="story-video-info"><span>{{ video.speaker }} · TED</span><h4>{{ video.title }}</h4><a href="{{ video.url }}" target="_blank" rel="noopener noreferrer">Watch on TED ↗</a></div>
     </article>
     {% endfor %}
+    <article class="story-video-card research-article-card">
+     <a class="research-article-image" href="{{ content.case_study.source_url }}" target="_blank" rel="noopener noreferrer" aria-label="Read how Andy's Pizza puts AI to work"><img src="https://images.unsplash.com/photo-1579751626657-72bc17010498?auto=format&amp;fit=crop&amp;w=900&amp;q=80" alt="Fresh pizza in a restaurant, illustrative photograph" loading="lazy"><span class="research-article-overlay">Read the story ↗</span></a>
+     <div class="story-video-info"><span>{{ content.case_study.source_name }} · {{ content.case_study.year }}</span><h4>{{ content.case_study.title }}</h4><p>{{ content.case_study.description }}</p><a href="{{ content.case_study.source_url }}" target="_blank" rel="noopener noreferrer">Read the case study ↗</a></div>
+    </article>
+    <article class="story-video-card research-article-card">
+     <a class="research-article-image" href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer" aria-label="Read about small businesses using AI and needing support"><img src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&amp;fit=crop&amp;w=900&amp;q=80" alt="Small business team collaborating, illustrative photograph" loading="lazy"><span class="research-article-overlay">Read the research ↗</span></a>
+     <div class="story-video-info"><span>Goldman Sachs · 2026</span><h4>Small businesses embrace AI—and want more support</h4><p>Business owners see the opportunity in AI, but practical training and guidance remain important.</p><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">Explore the research ↗</a></div>
+    </article>
    </div>
-   <a class="research-case" href="{{ content.case_study.source_url }}" target="_blank" rel="noopener noreferrer"><span class="research-case-icon" aria-hidden="true">↗</span><span class="research-case-copy"><small>{{ content.case_study.eyebrow }}</small><strong>{{ content.case_study.title }}</strong><span>{{ content.case_study.description }}</span></span><span class="research-case-link">{{ content.case_study.source_name }} · {{ content.case_study.year }} ↗</span></a>
    <p class="research-disclaimer">Independent research and perspectives, not endorsements of BloomBots.</p>
   </div>
  </div>
