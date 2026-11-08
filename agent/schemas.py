@@ -173,6 +173,10 @@ class Assignment(BaseModel):
     monthly_cost: float | None = None
     cost_basis: str = ""
     source_url: str = ""
+    site_url: str = ""  # vendor's website, separate from the price evidence URL
+    pricing_source_url: str = ""
+    pricing_checked_at: str = ""
+    tool_description: str = ""
     alternatives: list[dict] = Field(default_factory=list)  # other tools that also fit this part
     setup_complexity: str = "unknown"
     best_for: str = ""
