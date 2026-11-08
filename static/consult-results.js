@@ -204,7 +204,7 @@
         const site = official(t.site);
         const name = '<span>' + escape(t.name) + '</span>';
         return '<th scope="col">' + logo(t) + (site ? '<a href="' + escape(site) +
-          '" target="_blank" rel="noopener noreferrer" class="compare-site">' + name + '</a>' : name) + '</th>';
+          '" target="_blank" rel="noopener noreferrer" class="compare-site" aria-label="Open ' + escape(t.name) + ' website in a new tab">' + name + ' <span aria-hidden="true" class="external-link-arrow">↗</span></a>' : name) + '</th>';
       }).join('') + '</tr></thead><tbody>' +
       row('Monthly price', t => '<strong>' + escape(priceText(t)) + '</strong>' +
         (t.plan_name ? '<small class="compare-plan">' + escape(t.plan_name) + '</small>' : '')) +
