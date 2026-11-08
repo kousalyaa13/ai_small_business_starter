@@ -156,6 +156,64 @@
     }).join('') + '</div>';
   }
 
+  // A compact, consistent feature comparison for the first three visible recommendations.
+  // Only mark coverage when the tool's researched fit data supports it.
+  const comparePages = {};
+  function compareTools(need, tools, canEdit) {
+    if (!tools.length) return '<p class="caption">No tools found for this need yet.</p>';
+    const maxPage = Math.max(0, Math.ceil(tools.length / 3) - 1);
+    const page = Math.min(comparePages[need.id] || 0, maxPage);
+    comparePages[need.id] = page;
+    const shown = tools.slice(page * 3, page * 3 + 3);
+    const status = t => t.fit === 'built_for_this' ? '✓ Designed for this' :
+      t.fit === 'workable' ? '◐ With limitations' :
+      t.fit === 'poor' ? '— Not designed for this' : '— Not confirmed';
+    const logo = t => {
+      const url = official(t.site);
+      const initial = '<span class="compare-initial">' + escape((t.name || '?').slice(0, 1)) + '</span>';
+      if (!url) return initial;
+      let icon = '';
+      try { icon = new URL('/favicon.ico', url).href; } catch {}
+      return '<span class="compare-logo"><img src="' + escape(icon) +
+        '" alt="" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false">' +
+        '<span class="compare-initial" hidden>' + escape((t.name || '?').slice(0, 1)) + '</span></span>';
+    };
+    const row = (label, fn, className = '') => '<tr class="' + className + '"><th scope="row">' + label + '</th>' +
+      shown.map(t => '<td>' + fn(t) + '</td>').join('') + '</tr>';
+    const fitDetail = t => {
+      const fit = ({built_for_this:'Built for this',workable:'Works, with limits',poor:'Not designed for this'})[t.fit] || 'Fit not confirmed';
+      return '<strong>' + fit + '</strong>' + (t.fit_reason ? ' — ' + escape(t.fit_reason) : '');
+    };
+    const select = t => {
+      const selected = picks[need.id] === t.tool_id;
+      return canEdit ? '<button type="button" class="btn ' + (selected ? 'light' : 'blue') +
+        ' compare-pick" data-pick="' + escape(t.tool_id) + '" data-need="' + escape(need.id) +
+        '" aria-pressed="' + selected + '">' + (selected ? 'Selected ✓' : 'Select') + '</button>' :
+        (selected ? '<strong class="compare-yes">Selected ✓</strong>' : '—');
+    };
+    const pages = tools.length > 3 ? '<div class="compare-pagination"><span>' +
+      (page * 3 + 1) + '–' + Math.min((page + 1) * 3, tools.length) + ' of ' + tools.length + ' tools</span>' +
+      '<div><button type="button" class="nav-btn" data-compare-page="-1" ' + (page === 0 ? 'disabled' : '') +
+      ' aria-label="Previous comparison tools">‹</button><button type="button" class="nav-btn" data-compare-page="1" ' +
+      (page === maxPage ? 'disabled' : '') + ' aria-label="Next comparison tools">›</button></div></div>' : '';
+    return '<div class="compare-wrap"><div class="compare-intro"><div><span class="mini-label">AT A GLANCE</span>' +
+      '<h4>Compare your options</h4></div><span class="caption">Based on available vendor details; verify before purchasing.</span></div>' +
+      '<div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
+      shown.map(t => {
+        const site = official(t.site);
+        const name = '<span>' + escape(t.name) + '</span>';
+        return '<th scope="col">' + logo(t) + (site ? '<a href="' + escape(site) +
+          '" target="_blank" rel="noopener noreferrer" class="compare-site">' + name + '</a>' : name) + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      row('Monthly price', t => '<strong>' + escape(priceText(t)) + '</strong>' +
+        (t.plan_name ? '<small class="compare-plan">' + escape(t.plan_name) + '</small>' : '')) +
+      row('Best for', t => escape(pitch(t) || 'Not specified')) +
+      row('Setup type', t => escape(({'no-code':'✓ No-code','low-code':'◐ Low-code',developer:'Developer setup'})[t.setup_complexity] || 'Not confirmed')) +
+      row('Why this tool fits', fitDetail, 'compare-reason-row') +
+      row('Your choice', select, 'compare-action-row') +
+      '</tbody></table></div>' + pages + '</div>';
+  }
+
   function toolCard(need, t, canEdit, isNew, current) {
     const selected = picks[need.id] === t.tool_id;
     const also = (t.also_fits || []).map(id => needById(id)?.description).filter(Boolean);
@@ -206,7 +264,7 @@
       return head + '<p class="caption native-note">Both steps happen in ' + escape(native.name) +
         ', so no separate connector is needed.</p>';
     }
-    const carousel = tools.length ?
+    const carousel = false && tools.length ?
       '<div class="carousel"><div class="carousel-bar"><span class="caption carousel-count" id="carousel-count">' +
       tools.length + (tools.length === 1 ? ' tool' : ' tools') + '</span>' +
       '<span class="carousel-arrows"><button type="button" class="nav-btn" data-scroll="-1" aria-label="Previous tools">‹</button>' +
@@ -219,7 +277,7 @@
     const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
       (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
       (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
-    return head + searchBanner(need, tools.filter(isNew), current) + share + carousel +
+    return head + searchBanner(need, tools.filter(isNew), current) + share + compareTools(need, tools, canEdit) + carousel +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
   }
@@ -520,6 +578,13 @@
       text.classList.toggle('open', expandedPitch.has(id));
       toggle.textContent = expandedPitch.has(id) ? 'Less' : 'More';
       toggle.setAttribute('aria-expanded', String(expandedPitch.has(id)));
+      return;
+    }
+    const comparisonPage = e.target.closest('[data-compare-page]');
+    if (comparisonPage) {
+      const maxPage = Math.max(0, Math.ceil(toolsOf(needById(activeNeed)).length / 3) - 1);
+      comparePages[activeNeed] = Math.max(0, Math.min(maxPage, (comparePages[activeNeed] || 0) + Number(comparisonPage.dataset.comparePage)));
+      drawNeeds();
       return;
     }
     const arrow = e.target.closest('[data-scroll]');
