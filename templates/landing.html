@@ -26,7 +26,7 @@
   <div class="hero-copy">
    <div class="eyebrow"><span class="live-dot"></span> SMALL BUSINESSES. BIG POSSIBILITIES.</div>
    <h1>Every business<br>deserves to <em>bloom.</em></h1>
-   <p class="hero-lede">Meet BloomBots: a friendly way to discover practical AI and software solutions, compare your options, and build a plan that fits your business—not the other way around.</p>
+   <p class="hero-lede">Discover practical AI tools, compare costs, and build a plan that fits your business.</p>
    <div class="hero-actions"><a class="button primary" href="#industries">Help my business bloom <span aria-hidden="true">↗</span></a><a class="button outline" href="#approach">See how it works <span aria-hidden="true">↓</span></a></div>
    <div class="hero-foot"><span class="check-circle">✓</span> Built around your business <span class="hero-separator">·</span> No tool purchases or connections required</div>
   </div>
@@ -57,7 +57,7 @@
     <label class="challenge-option"><input type="radio" name="challenge" value="{{ challenge.id }}" {% if loop.first %}checked{% endif %}><span class="challenge-body"><span class="challenge-icon" aria-hidden="true">{{ challenge.icon }}</span><span class="challenge-name">{{ challenge.title }}</span><span class="challenge-desc">{{ challenge.description }}</span><span class="challenge-arrow" aria-hidden="true">↗</span></span></label>
    {% endfor %}
    </div></fieldset>
-   <div class="challenge-submit"><p><strong>Not sure where to begin?</strong><br>Every big change starts with one small step.</p><button class="button primary" type="submit">Find my growth plan <span aria-hidden="true">→</span></button></div>
+   <div class="challenge-submit"><button class="button primary" type="submit">Find my growth plan <span aria-hidden="true">→</span></button></div>
   </form>
  </div>
 </section>
@@ -77,14 +77,18 @@
 </section>
 <section class="section reveal research-section" id="research">
  <div class="container">
-  <div class="section-heading-row"><div><span class="eyebrow">GROWTH STARTS WITH UNDERSTANDING</span><h2>Growth starts with <em>understanding.</em></h2></div><p>Real research helps us ask better questions before suggesting technology.</p></div>
+  <div class="section-heading-row"><div><span class="eyebrow">WHY WE BUILT BLOOMBOTS</span><h2>Small businesses.<br><em>Big impact.</em></h2></div><p>AI is opening doors. Finding the right tools shouldn't be the hard part.</p></div>
   <div class="stats-grid">
   {% for stat in content.stats %}
    <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
+  <div class="research-quote">
+   <span class="research-quote-mark" aria-hidden="true">“</span>
+   <div><blockquote>“{{ content.research_quote.quote }}”</blockquote><a href="{{ content.research_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.research_quote.speaker }} · {{ content.research_quote.role }} ↗</a></div>
+  </div>
   <div class="research-stories" id="stories">
-   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>Hear from people building businesses.</h3></div></div>
+   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>See what support can unlock.</h3></div><blockquote class="owner-quote">“{{ content.owner_quote.quote }}”<cite><a href="{{ content.owner_quote.source_url }}" target="_blank" rel="noopener noreferrer">{{ content.owner_quote.speaker }} · {{ content.owner_quote.role }} ↗</a></cite></blockquote></div>
    <div class="story-video-grid">
     {% for video in content.videos[:2] %}
     <article class="story-video-card">
@@ -93,6 +97,8 @@
     </article>
     {% endfor %}
    </div>
+   <a class="research-case" href="{{ content.case_study.source_url }}" target="_blank" rel="noopener noreferrer"><span class="research-case-icon" aria-hidden="true">↗</span><span class="research-case-copy"><small>{{ content.case_study.eyebrow }}</small><strong>{{ content.case_study.title }}</strong><span>{{ content.case_study.description }}</span></span><span class="research-case-link">{{ content.case_study.source_name }} · {{ content.case_study.year }} ↗</span></a>
+   <p class="research-disclaimer">Independent research and perspectives, not endorsements of BloomBots.</p>
   </div>
  </div>
 </section>
@@ -108,13 +114,13 @@
    <div class="about-copy">
     <span class="eyebrow dark">OUR STORY · THE PEOPLE BEHIND THE PETALS</span>
     <h2>Small beginnings.<br><em>Big dreams.</em></h2>
-    <p>We're <strong>Kousalya and Anant</strong>—two ambitious students building BloomBots for a hackathon. We love exploring how technology can make everyday life easier, and we believe small businesses deserve the same opportunity to grow with AI as anyone else.</p>
-    <p>We named it <strong>Bloom</strong> for the growth and possibilities we want to help businesses discover, and <strong>Bots</strong> for friendly, approachable AI that can lighten the load. Our flower-powered robot is a reminder that even the biggest ideas start as small seeds.</p>
-    <div class="mission-strip"><span class="mission-symbol" aria-hidden="true">✿</span><div><strong>What we're growing toward</strong><p>Making technology feel less overwhelming—so business owners can spend less time figuring out tools and more time doing what they love.</p></div></div>
+    <p>We're <strong>Kousalya and Anant</strong>—two students who built BloomBots at a hackathon to make AI more approachable for small businesses.</p>
+    <p><strong>Bloom</strong> is the growth we believe in. <strong>Bots</strong> are the friendly AI helpers that make it easier to get started. Our little flower robot brings that idea to life.</p>
+    <div class="mission-strip"><span class="mission-symbol" aria-hidden="true">✿</span><div><strong>Our mission</strong><p>Help owners choose technology confidently—and get back to what they love.</p></div></div>
    </div>
   </div>
   <div class="founder-intro">
-   <div class="founder-intro-heading"><span class="eyebrow dark">A LITTLE HELLO FROM OUR TEAM</span><h3>Meet the humans (and bot) behind the bloom.</h3><p>Two students, one little robot, and a big belief in making useful technology more accessible.</p></div>
+   <div class="founder-intro-heading"><span class="eyebrow dark">A LITTLE HELLO FROM OUR TEAM</span><h3>Meet the humans (and bot) behind the bloom.</h3></div>
    <div class="founder-trio">
     <article class="founder-card"><div class="founder-portrait pink"><img src="{{ url_for('static', filename='kousalya-avatar.svg') }}" alt="Illustrated girl avatar representing Kousalya" loading="lazy"></div><div class="founder-card-copy"><span class="founder-wave">Hi there! <span aria-hidden="true">✿</span></span><h4>Kousalya</h4><p>Co-creator · Student builder</p><blockquote class="founder-belief">“I believe AI should empower people to do more of what they love, not make their lives more complicated.”</blockquote></div></article>
     <article class="founder-card"><div class="founder-portrait lavender"><img src="{{ url_for('static', filename='anant-avatar.svg') }}" alt="Illustrated boy avatar representing Anant" loading="lazy"></div><div class="founder-card-copy"><span class="founder-wave">Hey, hello! <span aria-hidden="true">✦</span></span><h4>Anant</h4><p>Co-creator · Student builder</p><blockquote class="founder-belief">“I believe small businesses have the potential to make a big impact, and technology should help unlock it.”</blockquote></div></article>
@@ -127,7 +133,7 @@
   </div>
  </div>
 </section>
-<section class="final-cta"><div class="container final-inner"><span class="eyebrow">READY TO PLANT YOUR FIRST SEED?</span><h2>Ready to grow<br><em>something great?</em></h2><p>Your next step starts with understanding what your business needs.</p><a href="#challenges" class="button white-button">Help my business bloom <span aria-hidden="true">↗</span></a><img class="final-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"></div></section>
+<section class="final-cta"><div class="container final-inner"><span class="eyebrow">READY TO PLANT YOUR FIRST SEED?</span><h2>Ready to grow<br><em>something great?</em></h2><p>Find your next step, one seed at a time.</p><a href="#challenges" class="button white-button">Help my business bloom <span aria-hidden="true">↗</span></a><img class="final-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"></div></section>
 </main>
 <footer class="footer"><div class="container footer-grid"><div><a class="brand" href="/"><img class="brand-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true">BloomBots<span class="brand-period">.</span></a><p>Small businesses. Big possibilities. Helping ideas bloom with approachable technology.</p></div><nav aria-label="Footer links"><a href="/solutions">Solutions</a><a href="/dashboard">Decision dashboard</a><a href="/consult">Personalized consultation</a><a href="#research">Research</a><a href="#about">About us</a></nav></div><div class="container footer-bottom"><span>© {{ year }} BloomBots · Hackathon prototype</span><span>Research informs recommendations. Always confirm current vendor details.</span></div></footer>
 </body></html>
