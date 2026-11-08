@@ -189,3 +189,8 @@
 .compare-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;color:#675c76;font-size:12px;font-weight:750;border-top:1px solid #eee8f3}
 .compare-pagination>div{display:flex;gap:8px}
 .compare-pagination .nav-btn{min-width:35px}
+
+/* Tool comparison sorting controls */
+.comparison-filters { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:18px 0 14px; }
+.comparison-filters .choice-chip { padding:9px 15px; }
+.comparison-filters .choice-chip.selected { background:#f0eafa; border-color:#7543cc; color:#58319b; font-weight:700; }
