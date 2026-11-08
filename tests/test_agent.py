@@ -200,7 +200,7 @@ class DiscoveryReuseTests(unittest.TestCase):
         import os
         from unittest import mock
         intake = Intake(problem_text=self.PHONE, monthly_budget=50, usage=Usage(monthly_volume=40))
-        with mock.patch.dict(os.environ, {"AGENT_MIN_ALTERNATIVES": "1"}):
+        with mock.patch.dict(os.environ, {"AGENT_MIN_GOOD_TOOLS": "1"}):
             self.first_run(intake)
             offline = self.Search([], fail=True)
             second = make_service(self.tmp.name, search=offline, fetcher=self.Fetcher({}))
@@ -251,7 +251,7 @@ class FitDrivenResearchTests(unittest.TestCase):
             status = svc.status(pid)
         booking = [c for c in status["components"] if c["capability"] == "appointment_booking"][0]
         self.assertTrue(search.queries)  # Calendly/Jobber are only "workable" for a restaurant, so research ran
-        self.assertTrue(any("weren't built for it" in n for n in status["research_notes"]))
+        self.assertTrue(any("known tool(s) are built for it" in n for n in status["research_notes"]))
         tools = {t["name"]: t for t in booking["tools"]}
         self.assertIn("TableBook", tools)
         self.assertEqual(tools["TableBook"]["fit"], "built_for_this")
@@ -274,6 +274,24 @@ class PlainNoteTests(unittest.TestCase):
             pid, _ = svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, business_type="plumbing"))
             for comp in svc.status(pid)["components"]:
                 self.assertTrue(comp["plain_note"].startswith("We "))
+
+
+class SkipResearchTests(unittest.TestCase):
+    def test_no_research_when_known_tools_already_handle_the_need(self):
+        """Two known tools rated "built for this" are enough: no web search runs for that need."""
+        search = ResearchMoreTests.Search([])
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = make_service(tmp, search=search, model=BuiltForThisModel(), fetcher=NoNetworkFetcher())
+            pid, _ = svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, business_type="plumbing"))
+            status = svc.status(pid)
+        crm = [c for c in status["components"] if c["capability"] == "crm_contacts"][0]
+        self.assertGreaterEqual(sum(t["fit"] == "built_for_this" for t in crm["tools"]), 2)
+        self.assertEqual(search.queries, [])
+        self.assertEqual(status["run"]["status"], "waiting_approval")
+
+    def test_one_good_tool_is_not_enough_by_default(self):
+        from agent.graph import Deps
+        self.assertEqual(Deps(store=None, model=None, search=None, fetcher=None).min_good_tools, 2)
 
 
 class BuiltForThisModel(StubModel):

@@ -54,8 +54,8 @@ class Deps:
     load_catalog: Callable[[], list[dict]] = catalog_mod.load_catalog
     # Discovered tools older than this are researched again instead of reused.
     discovered_max_age_days: int = field(default_factory=lambda: int(os.environ.get("AGENT_DISCOVERED_MAX_AGE_DAYS", 30)))
-    # Research again until a part the catalog can't cover has at least this many known tools.
-    min_alternatives: int = field(default_factory=lambda: int(os.environ.get("AGENT_MIN_ALTERNATIVES", 3)))
+    # Skip web research for a need once this many known tools are rated "built for this" for it.
+    min_good_tools: int = field(default_factory=lambda: int(os.environ.get("AGENT_MIN_GOOD_TOOLS", 2)))
 
 
 def build_graph(deps: Deps, checkpointer):
@@ -111,8 +111,8 @@ def build_graph(deps: Deps, checkpointer):
         discovered = store.discovered_tools(deps.discovered_max_age_days)
         candidates, gaps, notes = {}, [], []
         for comp in map(Component.model_validate, state["components"]):
-            # Vetted catalog first, plus tools found by earlier research. Parts the catalog
-            # can't cover are researched again whenever fewer than min_alternatives are known.
+            # Vetted catalog first, plus tools found by earlier research; which needs to research is
+            # decided below, once the known tools' fit is rated.
             vetted = catalog_mod.match(comp, intake, catalog)
             known = catalog_mod.match_discovered(comp, discovered, limit=None)
             found = vetted + [c for c in known if c.tool_id not in {v.tool_id for v in vetted}]
@@ -120,19 +120,24 @@ def build_graph(deps: Deps, checkpointer):
                 notes.append(f"Reused {len(known)} tool(s) found by earlier web research for '{comp.description}'.")
             candidates[comp.id] = [c.model_dump() for c in found]
             forced = comp.id in state.get("force_research", [])
-            if forced or (not vetted and len(known) < deps.min_alternatives):
+            if forced:
                 gaps.append(comp.id)
-        # Rate known tools' purpose now (one batched, cached call), so coverage means fit, not just category.
+        # Rate known tools' purpose first (one batched, cached call), then research only the needs that
+        # known tools don't already handle well: research is the slowest part of a consultation.
         candidates, fit_notes = fit_mod.assess(meter(state), deps.model, store, intake, state["components"], candidates)
         notes.extend(fit_notes)
         for comp in state["components"]:
+            if comp["id"] in gaps:
+                continue
             cands = candidates.get(comp["id"], [])
-            # A need counts as covered only if some tool is built for that job in this kind of business;
-            # connectors are excluded because general-purpose automation tools are fine there.
-            if (comp["id"] not in gaps and cands and comp["capability"] != "workflow_automation"
-                    and not any(c.get("fit") == "built_for_this" for c in cands)):
+            good = sum(1 for c in cands if c.get("fit") == "built_for_this")
+            if not cands:
                 gaps.append(comp["id"])
-                notes.append(f"Searching for tools made for '{comp['description']}': the known ones weren't built for it.")
+            elif comp["capability"] == "workflow_automation":
+                continue  # general-purpose connectors are fine; one known connector is enough
+            elif good < deps.min_good_tools:
+                gaps.append(comp["id"])
+                notes.append(f"Searching for tools made for '{comp['description']}': only {good} known tool(s) are built for it.")
         store.update_snapshot(state["run_id"], candidates=candidates, gaps=gaps, research_notes=notes)
         return {"candidates": candidates, "gaps": gaps, "research_notes": notes}
 

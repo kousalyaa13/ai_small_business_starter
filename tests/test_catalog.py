@@ -250,16 +250,20 @@ class CatalogAndOptionsTests(unittest.TestCase):
         tock = catalog.Candidate(tool_id="web:tock.example", name="Tock", source="web", vetted=False, capabilities=[],
                                  plans=[Plan(name="Base", monthly_price=79)], fit="built_for_this",
                                  fit_reason="Restaurant reservation system.")
-        cands = {"c1": [calendly, tock]}
-        options = build_options([need], cands, intake)
-        self.assertEqual(options[0].title, "Best fit")  # the default picks come from here
-        self.assertEqual(options[0].assignments[0].tool_name, "Tock")
-        cheapest = [o for o in options if o.title == "Lowest monthly cost"][0]
-        self.assertEqual(cheapest.assignments[0].tool_name, "Calendly")  # still available, clearly qualified
-        self.assertEqual(cheapest.assignments[0].fit, "workable")
-        listed = component_tools([need], cands, intake)["c1"]
-        self.assertEqual([t["name"] for t in listed], ["Tock", "Calendly"])
-        self.assertIn("pop-ups", listed[1]["fit_reason"])
+        # A tool built for the job exists, so the cheaper "works, with limits" tool is not shown or picked.
+        listed = component_tools([need], {"c1": [calendly, tock]}, intake)["c1"]
+        self.assertEqual([t["name"] for t in listed], ["Tock"])
+        options = build_options([need], {"c1": [calendly, tock]}, intake)
+        self.assertEqual(options[0].title, "Best fit")
+        self.assertTrue(all(o.assignments[0].tool_name == "Tock" for o in options))
+        # With nothing built for the job, the limited tool is shown, with its reason.
+        only = component_tools([need], {"c1": [calendly]}, intake)["c1"]
+        self.assertEqual([(t["name"], t["fit"]) for t in only], [("Calendly", "workable")])
+        self.assertIn("pop-ups", only[0]["fit_reason"])
+        # A limited tool the owner already uses stays visible: it costs nothing extra.
+        owned = calendly.model_copy(update={"owned": True})
+        self.assertEqual({t["name"] for t in component_tools([need], {"c1": [owned, tock]}, intake)["c1"]},
+                         {"Calendly", "Tock"})
 
     def test_tools_not_designed_for_the_job_are_never_the_cheapest_pick(self):
         intake = Intake(problem_text="Take table reservations", monthly_budget=200, business_type="restaurant")
@@ -271,6 +275,44 @@ class CatalogAndOptionsTests(unittest.TestCase):
                                plans=[Plan(name="Base", monthly_price=20)], fit="built_for_this")
         for option in build_options([need], {"c1": [poor, ok]}, intake):
             self.assertEqual(option.assignments[0].tool_name, "TableApp")
+
+    def test_unsuitable_tools_are_never_shown_recommended_or_priced(self):
+        from agent.options import build_selection, component_tools
+        intake = Intake(problem_text="Take table reservations", monthly_budget=200, business_type="restaurant")
+        need = Component(id="c1", capability="appointment_booking", description="Take table reservations",
+                         constraints=[], connects=[], search_query="")
+        poor = catalog.Candidate(tool_id="jobber", name="Jobber", source="catalog", vetted=True, capabilities=[],
+                                 plans=[Plan(name="Core", monthly_price=49)], fit="poor",
+                                 fit_reason="Home-service software, not for restaurants.")
+        limits = catalog.Candidate(tool_id="calendly", name="Calendly", source="catalog", vetted=True, capabilities=[],
+                                   plans=[Plan(name="Free", monthly_price=0)], fit="workable")
+        cands = {"c1": [poor, limits]}
+        self.assertEqual([t["name"] for t in component_tools([need], cands, intake)["c1"]], ["Calendly"])  # kept, qualified
+        for option in build_options([need], cands, intake):
+            self.assertNotIn("Jobber", [a.tool_name for a in option.assignments])
+        with self.assertRaises(ValueError):
+            build_selection([need], cands, intake, {"c1": "jobber"})
+        # A need with only unsuitable tools gets no option, rather than a bad recommendation.
+        self.assertEqual(build_options([need], {"c1": [poor]}, intake), [])
+
+    def test_a_priced_fallback_is_kept_when_specialists_hide_their_prices(self):
+        from agent.options import component_tools
+        intake = Intake(problem_text="Keep guest records", monthly_budget=100, business_type="restaurant")
+        need = Component(id="c1", capability="crm_contacts", description="Keep guest records",
+                         constraints=[], connects=[], search_query="")
+        unpriced = [catalog.Candidate(tool_id=f"web:{n.lower()}.example", name=n, source="web", vetted=False,
+                                      capabilities=[], plans=[Plan(name="Contact sales", monthly_price=None)],
+                                      fit="built_for_this") for n in ("EatApp", "SevenRooms")]
+        hubspot = catalog.Candidate(tool_id="hubspot", name="HubSpot", source="catalog", vetted=True, capabilities=[],
+                                    plans=[Plan(name="Free tools", monthly_price=0)], fit="workable")
+        zoho = catalog.Candidate(tool_id="zoho", name="Zoho CRM", source="web", vetted=False, capabilities=[],
+                                 plans=[Plan(name="Standard", monthly_price=14)], fit="workable")
+        shown = [t["name"] for t in component_tools([need], {"c1": [*unpriced, hubspot, zoho]}, intake)["c1"]]
+        self.assertEqual(set(shown), {"EatApp", "SevenRooms", "HubSpot"})  # cheapest priced limited tool only
+        # Once any specialist lists a price, the limited fallback is hidden again.
+        priced = unpriced[0].model_copy(update={"plans": [Plan(name="Pro", monthly_price=89)]})
+        shown = [t["name"] for t in component_tools([need], {"c1": [priced, unpriced[1], hubspot]}, intake)["c1"]]
+        self.assertNotIn("HubSpot", shown)
 
     def test_owned_tool_wins_cost_ties(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, existing_software=["Wix"])

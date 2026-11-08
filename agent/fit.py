@@ -12,7 +12,7 @@ from .budget import BudgetExceeded
 from .schemas import FitAssessments
 
 FIT_RANK = {"built_for_this": 0, "workable": 1, "unknown": 1, "poor": 2}
-MAX_PAIRS = 40
+MAX_PAIRS = 60
 
 FIT_INSTRUCTIONS = """You judge how well software products fit a business need, based on what each product is made for.
 For each pair, compare the product's intended purpose with the need and the type of business.

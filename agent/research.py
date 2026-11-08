@@ -326,7 +326,7 @@ class Researcher:
                  candidates_per_component=None):
         self.store, self.meter, self.model, self.search, self.fetcher = store, meter, model, search, fetcher
         # Check up to this many vendor sites per part, in parallel, to surface real alternatives.
-        self.candidates_per_component = candidates_per_component or int(os.environ.get("AGENT_RESEARCH_CANDIDATES", 8))
+        self.candidates_per_component = candidates_per_component or int(os.environ.get("AGENT_RESEARCH_CANDIDATES", 5))
         self.catalog_hosts = {base_host(t.get("site", "")) for t in catalog}
 
     def queries(self, component: Component, intake: Intake, goal=None, current_names=()):

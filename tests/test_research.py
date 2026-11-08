@@ -296,7 +296,7 @@ class ResearchTests(unittest.TestCase):
                                                constraints=[], connects=[], search_query=""), Intake(problem_text=EXAMPLE))
         self.assertEqual(len(queries), 2)
         self.assertTrue(all("answer phone calls" in q for q in queries))
-        self.assertEqual(researcher.candidates_per_component, 8)
+        self.assertEqual(researcher.candidates_per_component, 5)
 
     ARTICLE = ("<html><head><title>7 best AI receptionists for small business</title></head><body>"
                "<p>Goodcall is best for local storefronts. Smith.ai mixes AI and human answering. "

@@ -29,6 +29,33 @@ def _native(component: Component, picks: dict[str, Candidate | None]) -> Candida
     return None
 
 
+def suitable(cands: list[Candidate]) -> list[Candidate]:
+    """The tools worth showing for one need.
+
+    Tools rated "not designed for this" are never listed, recommended or priced. "Works, with limits"
+    tools are shown only when no tool is built for the job, except the cheapest priced one when none of
+    the built-for-the-job tools publishes a price. Tools the owner already uses (no extra cost) and tools
+    whose rating is missing are always kept, so a failed rating never hides a good tool.
+    """
+    cands = [c for c in cands if c.fit != "poor"]
+    built = [c for c in cands if c.fit == "built_for_this"]
+    if built:
+        priced = lambda c: [p.monthly_price for p in c.plans if p.monthly_price is not None]
+        keep = set()
+        # If no tool built for the job publishes a price, keep the cheapest priced limited tool, so the
+        # owner always has something that can be priced and saved.
+        if not any(priced(c) for c in built):
+            limited = [c for c in cands if c.fit == "workable" and priced(c)]
+            if limited:
+                keep.add(min(limited, key=lambda c: min(priced(c))).tool_id)
+        cands = [c for c in cands if c.fit != "workable" or c.owned or c.tool_id in keep]
+    return cands
+
+
+def suitable_by(cands_by: dict[str, list[Candidate]]) -> dict[str, list[Candidate]]:
+    return {cid: suitable(lst) for cid, lst in cands_by.items()}
+
+
 def _fit_rank(c: Candidate) -> int:
     return FIT_RANK.get(c.fit, 1)
 
@@ -180,6 +207,7 @@ def build_option(option_id, title, summary, components, picks, intake: Intake, c
 
 
 def build_options(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake) -> list[Option]:
+    cands_by = suitable_by(cands_by)
     strategies = [
         ("Best fit", "Tools made for each job in your kind of business, cheapest among equally good fits.",
          strategy_lowest_cost(components, cands_by, intake, best_fit=True)),
@@ -209,11 +237,6 @@ def build_options(components: list[Component], cands_by: dict[str, list[Candidat
         # An option with a part left uncovered can't be acted on, so it is not offered.
         if any(a.source == "none" for a in option.assignments):
             continue
-        # Nor is one that steers the owner to a tool not designed for a need when a better-suited tool exists;
-        # such tools stay visible, clearly labelled, in that need's list.
-        if any(a.fit == "poor" and any(_fit_rank(c) < 2 for c in cands_by.get(a.component_id, []))
-               for a in option.assignments):
-            continue
         options.append(option)
     # Options a small business can set up without developers first, then within budget, then cheapest.
     # "Best fit" leads (it supplies the default picks) unless it is over budget; then by fit, budget and price.
@@ -230,7 +253,8 @@ def build_options(components: list[Component], cands_by: dict[str, list[Candidat
 
 
 def component_tools(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake) -> dict[str, list[dict]]:
-    """Every tool found for each need, priced in code, with the other needs the same tool also fits."""
+    """Every suitable tool found for each need, priced in code, with the other needs the same tool also fits."""
+    cands_by = suitable_by(cands_by)
     fits = {}
     for comp in components:
         for c in cands_by.get(comp.id, []):
@@ -259,6 +283,7 @@ def component_tools(components: list[Component], cands_by: dict[str, list[Candid
 def build_selection(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake,
                     selections: dict[str, str]) -> Option:
     """Price the owner's own picks: a tool id per need, or "skip" / "have". Prices come from code, never the browser."""
+    cands_by = suitable_by(cands_by)
     picks, skipped = {}, {}
     for comp in components:
         choice = selections.get(comp.id)
