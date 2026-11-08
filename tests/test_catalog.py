@@ -4,7 +4,8 @@ from agent import catalog
 from agent.decompose import intake_prompt
 from agent.llm import StubModel
 from agent.options import build_options
-from agent.pricing import choose_plan, option_total
+from agent.pricing import choose_plan, option_total, plan_cost, plan_fits
+from agent.recovery import recovery_for
 from agent.schemas import Component, Decomposition, Intake, Plan, Usage
 
 EXAMPLE = ("Whenever someone fills out our contact form, add them to our CRM without creating duplicate "
@@ -26,6 +27,19 @@ class PricingTests(unittest.TestCase):
         choice = choose_plan([Plan(name="Pro", monthly_price=None)], Usage())
         self.assertIsNone(choice.monthly_cost)
         self.assertEqual(choose_plan([], Usage()).plan, None)
+
+    def test_read_only_viewers_are_free_only_when_verified(self):
+        plan = Plan(name="Team", monthly_price=20, billing="annual",
+                    per_seat=True, free_viewers=True)
+        team = Usage(seats=5, editors=3)
+        self.assertEqual(plan_cost(plan, team), 60)
+        self.assertEqual(plan_cost(plan.model_copy(update={"free_viewers": False}), team), 100)
+
+    def test_minimum_paid_members(self):
+        business = Plan(name="Business", monthly_price=19, per_seat=True,
+                        free_viewers=True, min_seats=3)
+        self.assertFalse(plan_fits(business, Usage(seats=5, editors=2))[0])
+        self.assertTrue(plan_fits(business, Usage(seats=5, editors=3))[0])
 
     def test_option_totals(self):
         self.assertEqual(option_total({"a": 10, "b": 15}, 30), (25, True, True))
@@ -122,6 +136,37 @@ class CatalogAndOptionsTests(unittest.TestCase):
         best = build_options([calls], {"c1": [dev, easy]}, intake)[0].assignments[0]
         self.assertEqual(best.tool_name, "Goodcall")
         self.assertEqual([(a["name"], a["setup_complexity"]) for a in best.alternatives], [("Vapi", "developer")])
+
+    def test_budget_near_miss_with_five_editors(self):
+        intake = Intake(problem_text="Develop and track annual fiscal budgets for five staff.",
+                        monthly_budget=75, usage=Usage(seats=5, editors=5))
+        components = [{"capability": "budget_planning"}, {"capability": "budget_tracking"}]
+        result = recovery_for(intake, components, self.catalog)
+        business = next(p for p in result["near_misses"]
+                        if p["tool_id"] == "smartsheet" and p["plan_name"] == "Business (annual billing)")
+        self.assertEqual((business["monthly_cost"], business["extra_per_month"]), (95, 20))
+        airtable = next(p for p in result["near_misses"]
+                        if p["tool_id"] == "airtable" and p["billing"] == "annual")
+        self.assertEqual((airtable["monthly_cost"], airtable["extra_per_month"]), (100, 25))
+
+    def test_budget_three_editors_two_viewers(self):
+        intake = Intake(problem_text="Develop and track annual fiscal budgets for five staff.",
+                        monthly_budget=75, usage=Usage(seats=5, editors=3))
+        components = [{"capability": "budget_planning"}, {"capability": "budget_tracking"}]
+        result = recovery_for(intake, components, self.catalog)
+        airtable = next(p for p in result["within_budget"]
+                        if p["tool_id"] == "airtable" and p["billing"] == "annual")
+        self.assertEqual(airtable["monthly_cost"], 60)
+        self.assertEqual(result["viewers"], 2)
+        self.assertEqual(result["status"], "within_budget")
+
+    def test_unrecognized_request_never_invents_a_budget_fix(self):
+        intake = Intake(problem_text="Build a custom spacecraft launch control system",
+                        monthly_budget=75, usage=Usage(seats=5))
+        result = recovery_for(intake, [{"capability": "other"}], self.catalog)
+        self.assertEqual(result["status"], "unrecognized")
+        self.assertEqual(result["plans"], [])
+        self.assertTrue(any("Clarify" in x for x in result["suggestions"]))
 
     def test_owned_tool_wins_cost_ties(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, existing_software=["Wix"])

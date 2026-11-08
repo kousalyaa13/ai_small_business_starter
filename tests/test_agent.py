@@ -6,7 +6,7 @@ from pathlib import Path
 from agent.llm import StubModel
 from agent.runner import InlineExecutor
 from agent.safe_fetch import FetchError
-from agent.schemas import Answers, ApprovalRequest, Intake, Usage
+from agent.schemas import Answers, ApprovalRequest, Intake, Usage, RevisionRequest
 from agent.service import AgentService, Conflict
 from agent.store import RunActive
 
@@ -100,6 +100,44 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn(run_id, svc.store.recoverable_runs())
         svc.runner.recover()
         self.assertEqual(svc.status(project_id)["run"]["status"], "waiting_approval")
+
+    def test_budget_consultation_can_be_repriced_without_losing_history(self):
+        svc = make_service(self.tmp.name)
+        request = ("Need to manage my budget development and tracking every fiscal year. "
+                   "Budget of 75 per month. 5 people need access.")
+        project_id, _ = svc.start(Intake(problem_text=request))
+        first = svc.status(project_id)
+        self.assertEqual(first["run"]["status"], "waiting_input")
+        self.assertEqual(first["questions"][0]["field"], "editors")
+        svc.answer(project_id, Answers(answers={"q_editors": "3"}))
+        first_plan = svc.status(project_id)
+        self.assertEqual(first_plan["run"]["status"], "waiting_approval")
+        self.assertEqual(first_plan["recovery"]["editors"], 3)
+        self.assertTrue(first_plan["recovery"]["within_budget"])
+        first_version = first_plan["plan"]["version"]
+        version, _ = svc.revise(project_id, RevisionRequest(editors=5))
+        updated = svc.status(project_id)
+        self.assertEqual(updated["requirement_version"], version)
+        self.assertGreater(updated["plan"]["version"], first_version)
+        self.assertEqual(updated["recovery"]["editors"], 5)
+        self.assertTrue(updated["recovery"]["near_misses"])
+        with self.assertRaises(Conflict):
+            svc.approve(project_id, ApprovalRequest(
+                plan_version=first_version, option_id="opt1", idempotency_key="old-plan-approval"))
+
+    def test_unresolved_gap_cannot_be_approved(self):
+        svc = make_service(self.tmp.name)
+        pid, _ = svc.start(Intake(problem_text="Create a custom spacecraft control system",
+                                  monthly_budget=75))
+        result = svc.status(pid)
+        # No complete option exists, so the run ends instead of waiting for an approval that can't happen;
+        # the recovery panel still offers ways to revise the request.
+        self.assertEqual((result["run"]["status"], result["run"]["step"]), ("completed", "no_complete_option"))
+        self.assertEqual(result["recovery"]["status"], "unrecognized")
+        with self.assertRaises(ValueError):
+            svc.approve(pid, ApprovalRequest(
+                plan_version=result["plan"]["version"], option_id="opt1",
+                idempotency_key="cannot-approve-gap"))
 
     def test_usage_is_recorded(self):
         svc = make_service(self.tmp.name)
@@ -208,6 +246,25 @@ class ApiTests(unittest.TestCase):
     def tearDown(self):
         self.flask.extensions["agent_service"] = self.original
         self.tmp.cleanup()
+
+    def test_revision_endpoint(self):
+        request = ("Need to manage my budget development and tracking every fiscal year. "
+                   "Budget of 75 per month. 5 people need access.")
+        r = self.client.post("/api/projects", json={"problem_text": request})
+        self.assertEqual(r.status_code, 202)
+        pid = r.get_json()["project_id"]
+        initial = self.client.get(f"/api/projects/{pid}").get_json()
+        self.assertEqual(initial["questions"][0]["field"], "editors")
+        self.assertEqual(self.client.post(f"/api/projects/{pid}/answers",
+                                          json={"answers": {"q_editors": "3"}}).status_code, 202)
+        changed = self.client.post(f"/api/projects/{pid}/revise",
+                                   json={"editors": 5, "monthly_budget": 75})
+        self.assertEqual(changed.status_code, 202)
+        result = self.client.get(f"/api/projects/{pid}").get_json()
+        self.assertEqual(result["intake"]["usage"]["editors"], 5)
+        self.assertEqual(result["recovery"]["status"], "within_budget")
+        self.assertEqual(self.client.post(f"/api/projects/{pid}/revise",
+                                          json={"editors": 8}).status_code, 400)
 
     def test_flow_over_http(self):
         self.assertEqual(self.client.get("/consult").status_code, 200)
