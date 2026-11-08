@@ -154,6 +154,37 @@
     }).join('') + '</div>';
   }
 
+  // A compact, consistent feature comparison for the first three visible recommendations.
+  // Only mark coverage when the tool's researched fit data supports it.
+  function compareTools(need, tools) {
+    const shown = tools.slice(0, 3);
+    if (shown.length < 2) return '';
+    const status = t => t.fit === 'built_for_this' ? '✓ Designed for this' :
+      t.fit === 'workable' ? '◐ With limitations' :
+      t.fit === 'poor' ? '— Not designed for this' : '— Not confirmed';
+    const logo = t => {
+      const url = official(t.site);
+      if (!url) return '<span class="compare-initial">' + escape((t.name || '?').slice(0, 1)) + '</span>';
+      let icon = '';
+      try { icon = new URL('/favicon.ico', url).href; } catch {}
+      return '<span class="compare-logo"><img src="' + escape(icon) + '" alt="" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false">' +
+        '<span class="compare-initial" hidden>' + escape((t.name || '?').slice(0, 1)) + '</span></span>';
+    };
+    const row = (label, fn) => '<tr><th scope="row">' + label + '</th>' +
+      shown.map(t => '<td>' + fn(t) + '</td>').join('') + '</tr>';
+    return '<div class="compare-wrap"><div class="compare-intro"><div><span class="mini-label">AT A GLANCE</span>' +
+      '<h4>Compare your options</h4></div><span class="caption">Based on available vendor details; verify before purchasing.</span></div>' +
+      '<div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
+      shown.map(t => '<th scope="col">' + logo(t) + '<span>' + escape(t.name) + '</span></th>').join('') +
+      '</tr></thead><tbody>' +
+      row('Monthly price', t => '<strong>' + escape(priceText(t)) + '</strong>') +
+      row('Setup type', t => escape(({'no-code':'✓ No-code','low-code':'◐ Low-code',developer:'Developer setup'})[t.setup_complexity] || 'Not confirmed')) +
+      row('Fit for this need', t => '<span class="' + (t.fit === 'built_for_this' ? 'compare-yes' : '') + '">' + status(t) + '</span>') +
+      row('Other needs covered', t => (t.also_fits || []).length ? escape((t.also_fits || []).map(id => needById(id)?.description).filter(Boolean).join('; ')) : '— Not confirmed') +
+      row('Listing details', t => t.vetted ? '✓ Reviewed' : 'Confirm with vendor') +
+      '</tbody></table></div></div>';
+  }
+
   function toolCard(need, t, canEdit, isNew, current) {
     const selected = picks[need.id] === t.tool_id;
     const also = (t.also_fits || []).map(id => needById(id)?.description).filter(Boolean);
@@ -212,7 +243,7 @@
     const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
       (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
       (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
-    return head + searchBanner(need, tools.filter(isNew), current) + share + carousel +
+    return head + searchBanner(need, tools.filter(isNew), current) + share + compareTools(need, tools) + carousel +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
   }
