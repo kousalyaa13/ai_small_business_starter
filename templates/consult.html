@@ -84,7 +84,7 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
  <section id="workspace" hidden>
   <div class="card consultation-status" id="consultation-card">
    <span class="eyebrow">Your consultation</span>
-   <h2 id="summary">Understanding your problem…</h2>
+   <h2 id="summary">Understanding your business needs…</h2>
    <p class="consult-goal" id="consult-goal" hidden></p>
    <div class="steps" id="steps"></div>
    <p class="caption" id="run-status" aria-live="polite"></p>
@@ -224,8 +224,7 @@ function renderQuestions(){
 const MATCH={catalog:['b-catalog','In our reviewed catalog'],web:['b-web','Found on the web · Unverified'],none:['b-none','No tool found'],pending:['b-pending','Checking…']};
 function renderComponents(){
  $('components').innerHTML=(data.components||[]).map(c=>{const m=MATCH[c.match]||MATCH.pending;
-  return `<div class="comp"><span class="badge ${m[0]}">${esc(m[1])}</span><div><b>${esc(c.description)}</b>
-  <small>${esc(c.capability.replaceAll('_',' '))}${c.constraints?.length?' · '+c.constraints.map(esc).join(' · '):''}${c.candidates?.length?' · Candidates: '+c.candidates.map(x=>esc(x.name)).join(', '):''}</small></div></div>`}).join('');
+  return `<div class="comp"><span class="need-check" aria-hidden="true">✓</span><div><b>${esc(c.description)}</b></div></div>`}).join('');
  // Research diagnostics remain in project data for debugging, not in the customer-facing UI.
  $('notes').hidden=true;$('notes').replaceChildren();
 }
