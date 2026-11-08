@@ -70,7 +70,8 @@
   // (or "I already have this" / "Skip"). Prices are always computed by the server.
   let activeNeed = null;                 // the need whose tools are shown in the carousel
   const trackScroll = {};                // carousel position per need, kept across redraws
-  const researching = new Set();        // needs with a search in progress
+  const researching = new Set();
+  let comparisonSort = 'recommended';        // needs with a search in progress
   let picks = {}, picksPlan = null;     // need id -> tool id | 'have' | 'skip'
   let preview = null, previewKey = '', previewTimer = null, suggestion = null, lastDrawn = '';
 
@@ -245,7 +246,18 @@
     const isNew = t => !!seen[need.id] && !seen[need.id].includes(t.tool_id);
     const current = pickedTool(need);
     // New finds first, so a finished search is easy to read; then the server's fit-and-price order.
-    const all = [...toolsOf(need)].sort((a, b) => isNew(b) - isNew(a));
+    const all = [...toolsOf(need)].sort((a, b) => {
+      if (comparisonSort === 'lowest') {
+        const costA = a.monthly_cost == null ? Infinity : a.monthly_cost;
+        const costB = b.monthly_cost == null ? Infinity : b.monthly_cost;
+        return costA - costB || isNew(b) - isNew(a);
+      }
+      if (comparisonSort === 'fit') {
+        const rank = {built_for_this: 0, workable: 1, unknown: 2, poor: 3};
+        return (rank[a.fit] ?? 2) - (rank[b.fit] ?? 2) || isNew(b) - isNew(a);
+      }
+      return isNew(b) - isNew(a);
+    });
     // Top tools only, unless the owner asks for all; a picked tool is always kept in view.
     const showAll = allTools.has(need.id) || all.length <= TOP_TOOLS;
     const tools = showAll ? all : all.filter((t, i) => i < TOP_TOOLS || t.tool_id === picks[need.id]);
@@ -280,7 +292,12 @@
     const showAllLink = all.length > TOP_TOOLS ? '<button type="button" class="link-btn show-all-btn" data-all="' +
       escape(need.id) + '">' + (showAll ? 'Show top ' + TOP_TOOLS + ' only' : 'Show all ' + all.length + ' tools') +
       '</button>' : '';
-    return head + searchBanner(need, tools.filter(isNew), current) + share + compareTools(need, tools, canEdit) + carousel +
+    const filters = '<div class="comparison-filters"><span class="caption">Sort tools:</span>' +
+      [['recommended','Recommended'],['fit','Best fit'],['lowest','Lowest monthly cost']].map(([value,label]) =>
+        '<button type="button" class="choice-chip' + (comparisonSort === value ? ' selected' : '') +
+        '" data-sort="' + value + '" aria-pressed="' + (comparisonSort === value) + '">' + label + '</button>').join('') +
+      '</div>';
+    return head + searchBanner(need, tools.filter(isNew), current) + share + filters + compareTools(need, tools, canEdit) + carousel +
       showAllLink +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
@@ -338,12 +355,20 @@
     else if (unpriced.length) message = [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
       ' doesn’t list a price on its website, so this selection can’t be saved yet. Pick another tool or skip that need.';
     else canSave = true;
-    const quick = (data.plan.options || []).map(opt => '<button type="button" class="quick-pick" data-quick="' +
-      escape(opt.id) + '">' + escape(opt.title) + '</button>').join('');
+    const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
+      !['skipped','existing','native','none'].includes(a.source)) || [];
+    // Deduplicate products used across multiple needs; the server's total remains authoritative.
+    const knownByTool = new Map();
+    for (const a of knownAssignments) knownByTool.set(a.tool_id || a.tool_name, Number(a.monthly_cost));
+    const knownSubtotal = [...knownByTool.values()].reduce((sum, value) => sum + value, 0);
+    const totalText = !o ? 'Calculating…' : o.total_is_complete ?
+      money(o.monthly_total) + '/month' : money(knownSubtotal) + '/month known';
+    const unknownNote = o && !o.total_is_complete ? 'Estimated subtotal only — tools without verified prices are excluded.' : '';
+    const quick = '';
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
-      (o ? priceClass(o) : '') + '">' + (o && o.total_is_complete ? money(o.monthly_total) + '/month' : '—') + '</strong> ' +
+      (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(message) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
+      escape(unknownNote ? unknownNote + ' ' + message : message) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
       (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
       '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
       '>Save this plan →</button></div>' : '') + '</div>';
@@ -565,6 +590,8 @@
     }
   });
   byId('options').addEventListener('click', e => {
+    const sort = e.target.closest('[data-sort]');
+    if (sort) { comparisonSort = sort.dataset.sort; comparePages[activeNeed] = 0; drawNeeds(); return; }
     const tab = e.target.closest('[data-tab]');
     if (tab) { openNeed(tab.dataset.tab); return; }
     const step = e.target.closest('[data-step]');
