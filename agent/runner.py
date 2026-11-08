@@ -53,8 +53,14 @@ class Runner:
                     self.graph.invoke(None, config)  # continue from the last checkpoint
                 else:
                     version, _ = self.store.latest_requirements(run["project_id"])
-                    self.graph.invoke({"project_id": run["project_id"], "run_id": run_id,
-                                       "requirement_version": version, "research_notes": []}, config)
+                    initial = {"project_id": run["project_id"], "run_id": run_id,
+                               "requirement_version": version, "research_notes": []}
+                    seed = run["snapshot"].get("seed")
+                    if seed:  # follow-up run: reuse the parts, research the requested ones again
+                        initial.update(summary=seed.get("summary", ""), components=seed["components"],
+                                       force_research=seed.get("force_research", []),
+                                       research_goal=seed.get("goal", "both"))
+                    self.graph.invoke(initial, config)
             state = self.graph.get_state(config)
             pending = [i.value for task in state.tasks for i in task.interrupts]
             if pending:

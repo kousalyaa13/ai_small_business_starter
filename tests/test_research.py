@@ -191,10 +191,11 @@ class ResearchTests(unittest.TestCase):
     def test_fabricated_price_is_dropped(self):
         fabricated = ExtractedTool(
             is_vendor_product_page=True, fits_need=True, small_business_fit=True, audience="small businesses",
+                                 fit="built_for_this", fit_reason="Made for this.",
             setup_complexity="no-code", name="LeadForms", capabilities=["form_capture"],
             description_quote="LeadForms lets you build a contact form and collect every submission in one place.",
             plans=[ExtractedPlan(name="Starter", monthly_price=5, per_seat=False, billing="monthly",
-                                 price_quote="Starter plan: $5/month")],
+                                 price_quote="Starter plan: $5/month", limits=[])],
             api_available=True, api_quote="Full REST API")
         researcher, _, _ = self.researcher(FixedExtraction(fabricated))
         found, _ = researcher.research(self.component, Intake(problem_text=EXAMPLE))
@@ -203,6 +204,7 @@ class ResearchTests(unittest.TestCase):
 
     def test_unverifiable_description_discards_candidate(self):
         invented = ExtractedTool(is_vendor_product_page=True, fits_need=True, small_business_fit=True, audience="small businesses",
+                                 fit="built_for_this", fit_reason="Made for this.",
                                  setup_complexity="no-code", name="LeadForms", capabilities=["form_capture"],
                                  description_quote="The #1 AI form builder trusted by millions.",
                                  plans=[], api_available=None, api_quote="")
@@ -343,6 +345,59 @@ class ResearchTests(unittest.TestCase):
         ranked = sorted([guide, westcx, forbes], key=article_score, reverse=True)
         self.assertEqual([r.url for r in ranked][:2], [forbes.url, westcx.url])
         self.assertLess(article_score(guide), 2)  # a vendor's own guide is not read as a comparison
+
+    def test_plan_limits_are_kept_only_when_quoted(self):
+        from agent.research import verified_limits
+        from agent.schemas import PlanLimit
+        page = "Starter $29/month for up to 300 bookings and 2 users. Pro $79/month for 1,500 bookings."
+        kept = verified_limits([PlanLimit(kind="bookings", amount=300, quote="up to 300 bookings"),
+                                PlanLimit(kind="users", amount=2, quote="2 users"),
+                                PlanLimit(kind="contacts", amount=5000, quote="5,000 contacts"),   # not on page
+                                PlanLimit(kind="bookings", amount=900, quote="1,500 bookings")], page)  # wrong number
+        self.assertEqual(kept, {"monthly_bookings": 300, "seats": 2})
+
+    def test_research_records_plan_limits(self):
+        page = ("<html><head><title>TableBook</title></head><body><p>TableBook takes restaurant reservations "
+                "and bookings online for small businesses.</p><p>Starter: $29/month for up to 300 bookings</p></body></html>")
+        need = Component(id="c1", capability="appointment_booking", description="Take reservations online",
+                         constraints=[], connects=[], search_query="restaurant reservation system")
+        researcher, _, fetcher = self.researcher(StubModel(), results=[SearchResult("TableBook", "https://tablebook.example/", "")])
+        fetcher.pages["https://tablebook.example/"] = page.replace("reservations", "reservations booking appointment")
+        found, _ = researcher.research(need, Intake(problem_text="Take reservations for my restaurant"))
+        self.assertEqual(found[0].plans[0].included, {"monthly_bookings": 300})
+
+    def test_fit_ratings_are_batched_and_cached(self):
+        from agent import fit
+        components = [{"id": "c1", "description": "Take table reservations"}]
+        cands = {"c1": [{"tool_id": "calendly", "name": "Calendly", "description": "Scheduling for appointments", "fit": "unknown"},
+                        {"tool_id": "web:x", "name": "TableBook", "description": "Reservations for restaurant owners",
+                         "fit": "built_for_this", "fit_reason": "Rated while reading its page."}]}
+        meter = Meter(self.store, self.run_id, self.project_id, Limits())
+        intake = Intake(problem_text="Restaurant reservations", business_type="restaurant")
+        rated, _ = fit.assess(meter, StubModel(), self.store, intake, components, cands)
+        self.assertEqual(rated["c1"][0]["fit"], "workable")        # rated in the batch
+        self.assertEqual(rated["c1"][1]["fit_reason"], "Rated while reading its page.")  # already rated: untouched
+        calls = meter.totals()["model_calls"]
+        again = {"c1": [{"tool_id": "calendly", "name": "Calendly", "description": "", "fit": "unknown"}]}
+        rated, _ = fit.assess(meter, StubModel(), self.store, intake, components, again)
+        self.assertEqual(meter.totals()["model_calls"], calls)    # served from the cache
+        self.assertEqual(rated["c1"][0]["fit"], "workable")
+
+    def test_fit_labels_echoed_loosely_still_match(self):
+        from agent import fit
+        from agent.schemas import FitAssessment, FitAssessments
+
+        class SloppyEcho(StubModel):
+            def structured(self, task, instructions, content, schema):
+                usage = super().structured("decompose", "", "Problem: x", __import__("agent.schemas").schemas.Decomposition)[1]
+                return FitAssessments(assessments=[FitAssessment(key=" [P1] ", fit="workable", reason="Appointment scheduler.")]), usage
+
+        components = [{"id": "c1", "description": "Take table reservations"}]
+        cands = {"c1": [{"tool_id": "calendly", "name": "Calendly", "description": "", "fit": "unknown"}]}
+        meter = Meter(self.store, self.run_id, self.project_id, Limits())
+        rated, _ = fit.assess(meter, SloppyEcho(), self.store, Intake(problem_text="x" * 12, business_type="restaurant"),
+                              components, cands)
+        self.assertEqual((rated["c1"][0]["fit"], rated["c1"][0]["fit_reason"]), ("workable", "Appointment scheduler."))
 
     def test_name_matches_host(self):
         from agent.research import name_matches_host

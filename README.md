@@ -126,6 +126,7 @@ Put keys in a `.env` file in the project folder (copy `.env.example`). It is git
 | `OPENROUTER_API_KEY` | Used when `OPENAI_API_KEY` is not set. Defaults: `openai/gpt-5-mini` for decomposition, `openai/gpt-5-nano` for extraction. `OPENROUTER_MODEL` sets one model for both. |
 | `AGENT_REASONING_EXTRACT`, `AGENT_REASONING_DECOMPOSE` | Reasoning effort per task (`none`, `minimal`, `low`, `medium`, `high`). Extraction defaults to `low`, which keeps vendor-page reading at a few seconds per page. |
 | `AGENT_RESEARCH_CANDIDATES`, `AGENT_MIN_ALTERNATIVES` | Vendor sites checked per uncovered part (default 8), and how many known tools a part needs before research is skipped (default 3). |
+| *(fit ratings)* | Every tool is rated for each need and business type as "Built for this", "Works, with limits" or "Not designed for this", with a reason. Tools found online are rated while their pages are read; catalog and saved tools in one batched call per run, cached by tool, need and business type. A need counts as covered only if some tool is built for it, otherwise it is researched. "Reviewed listing" means the price and details were checked, not that the tool fits. |
 | `AGENT_DISCOVERED_MAX_AGE_DAYS` | How long a web-discovered tool is reused before it is researched again (default 30). |
 | `AGENT_PROVIDER` | Force `openai`, `openrouter` or `stub`, regardless of which keys are set. |
 | `OPENAI_MODEL`, `AGENT_MODEL_DECOMPOSE`, `AGENT_MODEL_EXTRACT` | Model per task (the last two default to `OPENAI_MODEL`). |
@@ -134,7 +135,9 @@ Put keys in a `.env` file in the project folder (copy `.env.example`). It is git
 | `AGENT_MAX_SEARCHES`, `AGENT_MAX_FETCHES`, `AGENT_MAX_MODEL_CALLS`, `AGENT_MAX_RUN_TOKENS`, `AGENT_MAX_RUN_USD` | Hard per-run limits. |
 | `AGENT_PRICE_IN_PER_MTOK`, `AGENT_PRICE_CACHED_IN_PER_MTOK`, `AGENT_PRICE_OUT_PER_MTOK`, `AGENT_PRICE_PER_SEARCH` | Unit prices for spend estimates. If unset, spend is recorded as unknown and the token limit applies. |
 
-API: `POST /api/projects`, `GET /api/projects/<id>`, `POST /api/projects/<id>/answers`, `POST /api/projects/<id>/approve`.
+API: `POST /api/projects`, `GET /api/projects/<id>`, `POST /api/projects/<id>/answers`, `POST /api/projects/<id>/approve`, `POST /api/projects/<id>/research`.
+
+**Find cheaper or better options.** Parts covered by the catalog or by saved discoveries are not searched again automatically, so the customer can ask for more: each tool on a result card has a "Find cheaper or better options" button, and the toolbar has one for every part. `POST /api/projects/<id>/research` with `{"component_ids": [...], "goal": "cheaper" | "better" | "both"}` (no ids means every part) starts a follow-up run that reuses the current parts, searches for alternatives to the tools already shown and cheaper ones for the business type, skips tools already listed, and saves a new plan version. It is refused while another search runs or after a plan is approved, and approval is refused while the search runs.
 
 ### Not yet verified
 - Decomposition and extraction quality with a real model. The tests use the stub.

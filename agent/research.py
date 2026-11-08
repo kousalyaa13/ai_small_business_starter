@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import requests
 
 from .budget import BudgetExceeded, Meter
+from .fit import fit_key
 from .capabilities import CAPABILITIES
 from .safe_fetch import FetchError, Page, SafeFetcher
 from .schemas import ArticleTools, Candidate, Component, Evidence, ExtractedTool, Intake, Plan
@@ -41,6 +42,12 @@ Rules:
 - is_vendor_product_page is true only if the page is the official site of a software product (not a review, list or blog).
 - fits_need is true only if the product's main purpose fulfils the "Component needed" described
   below (not a side feature or an integration).
+- fit: judge the product's intended purpose against this need for this type of business.
+  "built_for_this" = made for exactly this job in this kind of business (e.g. a restaurant table-booking
+  system for restaurant reservations); "workable" = can do the job but was made for something else or
+  needs workarounds (e.g. an appointment scheduler used for restaurant reservations); "poor" = would
+  technically cover it but is a bad match. fit_reason: one plain sentence (max 25 words) saying what the
+  product is made for and what that means for this business.
 - name: the product name without taglines (e.g. "Typeform"). If the product name is generic,
   include the company (e.g. "RingCentral AI Receptionist", not "AI Receptionist").
 - capabilities: only the product's primary purposes as the page presents them. Do not include a tag
@@ -48,6 +55,9 @@ Rules:
 - description_quote: copy one sentence verbatim from the page text describing what the product does.
 - plans: for each plan whose monthly price is stated, copy the exact text stating the price into price_quote.
   If no price is stated, set monthly_price to null. Use billing "annual" if the price is only for yearly billing.
+- limits: for each plan, the usage limits the page states for it (e.g. "up to 3 users", "500 bookings per month",
+  "1,000 contacts"), each with the exact text in quote. kind is users, contacts, bookings, calls, messages,
+  minutes or tasks. Leave limits empty if none are stated; never guess.
 - api_quote: copy verbatim text mentioning an API or developer platform, or "" if none.
 - audience: who the page says the product is for, in a few words (e.g. "small local businesses",
   "enterprise contact centers", "dental practices", "developers building voice apps").
@@ -242,6 +252,24 @@ def price_in_quote(price, quote) -> bool:
     return bool(re.search(rf"(?<![\d.]){pattern}(?![\d])", quote))
 
 
+# Page limit kinds -> Plan.included keys understood by pricing.
+LIMIT_KEYS = {"users": "seats", "contacts": "contacts", "bookings": "monthly_bookings", "calls": "monthly_calls",
+              "messages": "monthly_messages", "minutes": "monthly_minutes", "tasks": "monthly_tasks"}
+
+
+def verified_limits(limits, page_text) -> dict[str, int]:
+    """Keep a limit only if its quote is on the page and states the same number."""
+    kept = {}
+    for limit in limits or []:
+        key = LIMIT_KEYS.get(limit.kind)
+        if not key or limit.amount <= 0 or not quote_on_page(limit.quote, page_text):
+            continue
+        numbers = {int(n.replace(",", "")) for n in re.findall(r"\d[\d,]*", limit.quote)}
+        if limit.amount in numbers:
+            kept[key] = limit.amount
+    return kept
+
+
 def clean_tool_name(name):
     """'LobbyStack (ours)' -> 'LobbyStack'; drop parenthetical asides and trailing punctuation."""
     return re.sub(r"\s*\([^)]*\)", "", name or "").strip(" .,:;-") or (name or "").strip()
@@ -301,14 +329,22 @@ class Researcher:
         self.candidates_per_component = candidates_per_component or int(os.environ.get("AGENT_RESEARCH_CANDIDATES", 8))
         self.catalog_hosts = {base_host(t.get("site", "")) for t in catalog}
 
-    def queries(self, component: Component, intake: Intake):
+    def queries(self, component: Component, intake: Intake, goal=None, current_names=()):
         """The breakdown step writes a plain search query per part; "best ..." surfaces comparison
-        articles and the bare query surfaces vendor sites."""
+        articles and the bare query surfaces vendor sites. A user-requested search adds queries for
+        alternatives to the tools already shown, and for cheaper ones."""
         query = " ".join((component.search_query or "").split()).rstrip(".").lower()
         if not query:
             need = component.description if component.capability == "other" else CAPABILITIES.get(component.capability, "")
             query = f"{need.rstrip('.').lower()} software for small business"
-        return [f"best {query}", query]
+        queries = [f"best {query}", query]
+        if goal:
+            audience = intake.business_type or "small business"
+            for name in list(current_names)[:2]:
+                queries.append(f"{name} alternatives for {audience}")
+            if goal in ("cheaper", "both"):
+                queries.append(f"affordable {query} alternatives")
+        return list(dict.fromkeys(queries))
 
     def _search(self, query):
         cached = self.store.cache_get(self.meter.run_id, "search", query)
@@ -341,25 +377,28 @@ class Researcher:
         return (not host or host in self.catalog_hosts
                 or in_domains(host, SKIP_DOMAINS))
 
-    def research(self, component: Component, intake: Intake) -> tuple[list[Candidate], list[str]]:
+    def research(self, component: Component, intake: Intake, goal=None, current_names=(),
+                 exclude_hosts=frozenset()) -> tuple[list[Candidate], list[str]]:
         label = component.capability.replace("_", " ") if component.capability != "other" else component.description
         if self.search is None:
             return [], [f"Web research unavailable for '{label}': no search API key is configured."]
         notes, leads, found_articles = [], {}, {}
         try:
-            for query in self.queries(component, intake):
+            for query in self.queries(component, intake, goal, current_names):
                 for result in self._search(query):
                     host = base_host(result.url)
                     if not host or in_domains(host, NON_SOURCE_DOMAINS):
                         continue
                     if looks_like_listicle(result) or in_domains(host, REVIEW_MEDIA_DOMAINS):
                         found_articles.setdefault(result.url, result)
-                    elif not self._skippable(host) and host not in leads:
+                    elif not self._skippable(host) and host not in leads and host not in exclude_hosts:
                         leads[host] = Lead(url=result.url, host=host)
             # Pick the best articles from all queries, not just the first ones returned.
             ranked = sorted(found_articles.values(), key=article_score, reverse=True)
             articles = [r.url for r in ranked if article_score(r) >= 2][: self.max_articles]
             for lead in self._mine_articles(component, articles, notes):
+                if lead.host in exclude_hosts:
+                    continue  # already shown to the customer
                 if lead.host in leads:
                     leads[lead.host].mentions += lead.mentions
                     leads[lead.host].best_for = leads[lead.host].best_for or lead.best_for
@@ -488,7 +527,8 @@ class Researcher:
                         and price_in_quote(p.monthly_price, p.price_quote))
             if verified:
                 plans.append(Plan(name=p.name[:60], monthly_price=p.monthly_price, billing=p.billing,
-                                  per_seat=p.per_seat, evidence=p.price_quote[:200]))
+                                  per_seat=p.per_seat, evidence=p.price_quote[:200],
+                                  included=verified_limits(p.limits, text)))
                 evidence.append(Evidence(url=pages[-1]["url"], quote=p.price_quote[:200]))
             elif p.monthly_price is not None:
                 dropped += 1
@@ -505,6 +545,8 @@ class Researcher:
                               pricing_source_url=pages[-1]["url"] if plans else "",
                               evidence=evidence, notes=notes, audience=extracted.audience[:80],
                               setup_complexity=extracted.setup_complexity, best_for=lead.best_for,
-                              mentions=lead.mentions)
+                              mentions=lead.mentions, fit=extracted.fit, fit_reason=extracted.fit_reason[:200])
         self.store.save_discovered(candidate, component.description)
+        self.store.save_fit(fit_key(candidate.tool_id, component.description, intake.business_type),
+                            candidate.fit, candidate.fit_reason)
         return candidate, None
