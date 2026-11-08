@@ -178,6 +178,101 @@ class CatalogAndOptionsTests(unittest.TestCase):
         self.assertEqual(result["plans"], [])
         self.assertTrue(any("Clarify" in x for x in result["suggestions"]))
 
+    def test_monthly_limits_from_vendor_pages_filter_plans(self):
+        plans = [Plan(name="Starter", monthly_price=29, included={"monthly_bookings": 300}),
+                 Plan(name="Pro", monthly_price=79, included={"monthly_bookings": 1500})]
+        self.assertEqual(choose_plan(plans, Usage(monthly_volume=200)).plan.name, "Starter")
+        self.assertEqual(choose_plan(plans, Usage(monthly_volume=1200)).plan.name, "Pro")
+
+    def test_pricing_questions_only_when_a_price_depends_on_them(self):
+        from agent.options import pricing_questions
+        booking = Component(id="c1", capability="appointment_booking", description="Take reservations",
+                            constraints=[], connects=[], search_query="")
+        tool = catalog.Candidate(tool_id="web:tablebook.example", name="TableBook", source="web", vetted=False,
+                                 capabilities=[], plans=[Plan(name="Starter", monthly_price=29, included={"monthly_bookings": 300})])
+        seat_tool = catalog.Candidate(tool_id="web:staffapp.example", name="StaffApp", source="web", vetted=False,
+                                      capabilities=[], plans=[Plan(name="Team", monthly_price=4, per_seat=True)])
+        staff = Component(id="c2", capability="other", description="Staff scheduling", constraints=[], connects=[], search_query="")
+        cands = {"c1": [tool], "c2": [seat_tool]}
+        unknown = Intake(problem_text=EXAMPLE, monthly_budget=100)
+        qs = pricing_questions(build_options([booking, staff], cands, unknown), cands, unknown)
+        self.assertEqual([q["field"] for q in qs], ["monthly_volume", "seats"])
+        self.assertIn("up to 300", qs[0]["question"])
+        known = Intake(problem_text=EXAMPLE, monthly_budget=100, usage=Usage(seats=4, monthly_volume=250))
+        self.assertEqual(pricing_questions(build_options([booking, staff], cands, known), cands, known), [])
+
+    def selection_setup(self):
+        intake = Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=50))
+        comps = self.decompose(EXAMPLE, monthly_budget=30).components
+        cands = {c.id: catalog.match(c, intake, self.catalog) for c in comps}
+        ids = {c.capability: c.id for c in comps}
+        return intake, comps, cands, ids
+
+    def test_every_need_lists_its_tools_with_prices_and_shared_fits(self):
+        from agent.options import component_tools
+        intake, comps, cands, ids = self.selection_setup()
+        tools = component_tools(comps, cands, intake)
+        crm = {t["name"]: t for t in tools[ids["crm_contacts"]]}
+        self.assertEqual(set(crm), {"HubSpot", "Jobber"})
+        self.assertEqual((crm["HubSpot"]["plan_name"], crm["HubSpot"]["monthly_cost"]), ("Free tools", 0.0))
+        self.assertIn(ids["form_capture"], crm["HubSpot"]["also_fits"])  # HubSpot also does the form
+
+    def test_owner_selection_is_priced_in_code(self):
+        from agent.options import build_selection
+        intake, comps, cands, ids = self.selection_setup()
+        hub = {ids["form_capture"]: "hubspot", ids["crm_contacts"]: "hubspot"}
+        same_tool = build_selection(comps, cands, intake, hub)
+        connector = [a for a in same_tool.assignments if a.capability == "workflow_automation"][0]
+        self.assertEqual(connector.source, "native")  # both ends in HubSpot: no connector to buy
+        self.assertEqual((same_tool.monthly_total, same_tool.total_is_complete), (0.0, True))
+
+        mixed = build_selection(comps, cands, intake, {ids["form_capture"]: "mailchimp", ids["crm_contacts"]: "jobber",
+                                                       ids["workflow_automation"]: "zapier"})
+        self.assertEqual(mixed.monthly_total, 49.0)  # Mailchimp Free + Jobber Core + Zapier Free
+
+        skipped = build_selection(comps, cands, intake, {ids["form_capture"]: "have", ids["crm_contacts"]: "jobber",
+                                                         ids["workflow_automation"]: "skip"})
+        self.assertEqual([a.source for a in skipped.assignments], ["existing", "catalog", "skipped"])
+        self.assertEqual(skipped.monthly_total, 49.0)
+
+        unpicked = build_selection(comps, cands, intake, {ids["crm_contacts"]: "jobber"})
+        self.assertIn("none", [a.source for a in unpicked.assignments])  # a need without a pick can't be saved
+        with self.assertRaises(ValueError):
+            build_selection(comps, cands, intake, {ids["crm_contacts"]: "web:not-a-candidate.example"})
+
+    def test_purpose_comes_before_price(self):
+        from agent.options import component_tools
+        intake = Intake(problem_text="Take table reservations", monthly_budget=200, business_type="restaurant")
+        need = Component(id="c1", capability="appointment_booking", description="Take table reservations",
+                         constraints=[], connects=[], search_query="")
+        calendly = catalog.Candidate(tool_id="calendly", name="Calendly", source="catalog", vetted=True, capabilities=[],
+                                     plans=[Plan(name="Free", monthly_price=0)], fit="workable",
+                                     fit_reason="Appointment scheduler; not made for restaurant tables. Fine for pop-ups.")
+        tock = catalog.Candidate(tool_id="web:tock.example", name="Tock", source="web", vetted=False, capabilities=[],
+                                 plans=[Plan(name="Base", monthly_price=79)], fit="built_for_this",
+                                 fit_reason="Restaurant reservation system.")
+        cands = {"c1": [calendly, tock]}
+        options = build_options([need], cands, intake)
+        self.assertEqual(options[0].title, "Best fit")  # the default picks come from here
+        self.assertEqual(options[0].assignments[0].tool_name, "Tock")
+        cheapest = [o for o in options if o.title == "Lowest monthly cost"][0]
+        self.assertEqual(cheapest.assignments[0].tool_name, "Calendly")  # still available, clearly qualified
+        self.assertEqual(cheapest.assignments[0].fit, "workable")
+        listed = component_tools([need], cands, intake)["c1"]
+        self.assertEqual([t["name"] for t in listed], ["Tock", "Calendly"])
+        self.assertIn("pop-ups", listed[1]["fit_reason"])
+
+    def test_tools_not_designed_for_the_job_are_never_the_cheapest_pick(self):
+        intake = Intake(problem_text="Take table reservations", monthly_budget=200, business_type="restaurant")
+        need = Component(id="c1", capability="appointment_booking", description="Take table reservations",
+                         constraints=[], connects=[], search_query="")
+        poor = catalog.Candidate(tool_id="a", name="FormTool", source="catalog", vetted=True, capabilities=[],
+                                 plans=[Plan(name="Free", monthly_price=0)], fit="poor")
+        ok = catalog.Candidate(tool_id="b", name="TableApp", source="web", vetted=False, capabilities=[],
+                               plans=[Plan(name="Base", monthly_price=20)], fit="built_for_this")
+        for option in build_options([need], {"c1": [poor, ok]}, intake):
+            self.assertEqual(option.assignments[0].tool_name, "TableApp")
+
     def test_owned_tool_wins_cost_ties(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, existing_software=["Wix"])
         comps = self.decompose(EXAMPLE, monthly_budget=30).components

@@ -19,6 +19,8 @@ Rules:
   something else that merely involves a tagged task (e.g. answering phone calls and also booking jobs),
   use "other" for that main job; add a separate tagged component only if a separate tool is needed.
   Example: an AI phone receptionist that books appointments is "other", not "appointment_booking".
+- Each component is one job that a single product does. If the owner asks for two jobs in one breath
+  (e.g. "staff scheduling and payroll"), make two components.
 - Only include components the owner's outcome needs. Do not add extras they did not ask for
   (e.g. separate file storage, backups, analytics or reporting) unless the outcome cannot work without them.
 - Add a "workflow_automation" component only when data must move between two different components;
@@ -31,8 +33,10 @@ Rules:
   strictly necessary for the component to work. Do not invent features, quantities or extras.
 - Never put budget, price, seats or volume in constraints; the application handles those separately.
 - For duplicates, match on email unless the owner names a different identifier.
-- Ask a clarifying question only if the answer would change which tools fit (budget, volume, seats, paid editors,
-  where existing data lives). Do not ask about anything already provided. At most 2 questions.
+- Ask at most one clarifying question, and only if the answer changes which kind of tool is needed
+  (e.g. where an existing form or customer list lives). Do not ask about volume, number of users or editors,
+  or budget: those are asked later, only when a shown plan's price depends on them. Do not ask about
+  anything already provided.
 - summary: one sentence, 25 words or fewer.
 - Use ids c1, c2, ... and q1, q2, ...
 Allowed capability tags:
@@ -73,7 +77,12 @@ def clean_decomposition(result: Decomposition, intake: Intake) -> tuple[list[Com
                 "contacts": intake.usage.contacts is not None,
                 "editors": intake.usage.editors is not None,
                 "seats": True}
-    questions = [q for q in result.questions if not answered.get(q.field, False)][:3]
+    # Before research, only questions that change the search or ranking are asked. Volume, team size
+    # and editor counts are asked after options exist, and only if a shown plan's price depends on them.
+    priced_later = {"monthly_volume", "contacts", "seats", "editors"}
+    questions = [q for q in result.questions
+                 if q.field not in priced_later and not answered.get(q.field, False)][:1]
+
     budget_caps = {"budget_planning", "budget_tracking", "financial_reporting", "budget_approvals"}
     if (intake.usage.seats > 1 and intake.usage.editors is None
             and any(c.capability in budget_caps for c in components)
@@ -85,7 +94,7 @@ def clean_decomposition(result: Decomposition, intake: Intake) -> tuple[list[Com
     if not answered["monthly_budget"] and not any(q.field == "monthly_budget" for q in questions):
         questions.insert(0, ClarifyingQuestion(id="q_budget", field="monthly_budget",
                                                question="What is the most you want to spend per month on new software?"))
-    return components, questions[:2]
+    return components, questions[:3]
 
 
 def apply_answers(intake: Intake, questions: list[dict], answers: dict[str, str]) -> Intake:
@@ -93,6 +102,9 @@ def apply_answers(intake: Intake, questions: list[dict], answers: dict[str, str]
     for q in questions:
         raw = str(answers.get(q["id"], "")).strip()
         if not raw:
+            continue
+        if q["field"] == "business_type":
+            data["business_type"] = raw[:80]
             continue
         if q["field"] in ("monthly_budget", "monthly_volume", "contacts", "seats", "editors"):
             digits = "".join(ch for ch in raw.replace(",", "") if ch.isdigit() or ch == ".")
@@ -107,4 +119,8 @@ def apply_answers(intake: Intake, questions: list[dict], answers: dict[str, str]
                 data["usage"][q["field"]] = int(number)
         else:
             data["requirements"].append(f"{q['question']} {raw}"[:200])
+    usage = data["usage"]
+    # "3 people need admin access" when the team size was never given means the team is at least 3.
+    if usage.get("editors") and usage["editors"] > usage.get("seats", 1):
+        usage["seats"] = usage["editors"]
     return Intake.model_validate(data)

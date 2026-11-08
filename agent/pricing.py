@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from .schemas import Plan, Usage
 
 # plan limit key -> Usage attribute it constrains
-LIMIT_TO_USAGE = {"seats": "seats", "contacts": "contacts", "monthly_tasks": "monthly_volume"}
+LIMIT_TO_USAGE = {"seats": "seats", "contacts": "contacts", "monthly_tasks": "monthly_volume",
+                  # Per-month allowances read from vendor pages; compared with the owner's monthly volume.
+                  "monthly_bookings": "monthly_volume", "monthly_calls": "monthly_volume",
+                  "monthly_messages": "monthly_volume", "monthly_minutes": "monthly_volume"}
 
 
 @dataclass

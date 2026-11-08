@@ -1,6 +1,7 @@
 """Turn matched candidates into two or three priced recommendation options."""
 from __future__ import annotations
 
+from .fit import FIT_RANK
 from .pricing import choose_plan, option_total
 from .schemas import Assignment, Candidate, Component, Intake, Option
 
@@ -28,19 +29,28 @@ def _native(component: Component, picks: dict[str, Candidate | None]) -> Candida
     return None
 
 
-def _pick_cheapest(component, cands, intake, chosen_tools):
+def _fit_rank(c: Candidate) -> int:
+    return FIT_RANK.get(c.fit, 1)
+
+
+def _pick_cheapest(component, cands, intake, chosen_tools, best_fit=False):
     if not cands:
         return None
     # Developer-only tools are shown as alternatives but are not picked while a no/low-code tool exists.
-    return min(cands, key=lambda c: (c.setup_complexity == "developer", _min_cost(c, intake), not c.owned,
-                                     c.tool_id not in chosen_tools, not c.vetted, c.name))
+    # A tool not designed for the job is never picked while a better-suited one exists; "best fit"
+    # goes further and puts purpose ahead of price.
+    def key(c):
+        purpose = (_fit_rank(c),) if best_fit else (_fit_rank(c) == 2,)
+        return (c.setup_complexity == "developer", *purpose, _min_cost(c, intake), not c.owned,
+                c.tool_id not in chosen_tools, not c.vetted, c.name)
+    return min(cands, key=key)
 
 
-def strategy_lowest_cost(components, cands_by, intake, vetted_only=False):
+def strategy_lowest_cost(components, cands_by, intake, vetted_only=False, best_fit=False):
     picks: dict[str, Candidate | None] = {}
     for comp in components:
         cands = [c for c in cands_by.get(comp.id, []) if c.vetted or not vetted_only]
-        picks[comp.id] = _pick_cheapest(comp, cands, intake, {p.tool_id for p in picks.values() if p})
+        picks[comp.id] = _pick_cheapest(comp, cands, intake, {p.tool_id for p in picks.values() if p}, best_fit)
     return picks
 
 
@@ -54,7 +64,7 @@ def strategy_fewest_tools(components, cands_by, intake):
                 tools.setdefault(cand.tool_id, (cand, []))[1].append(comp.id)
         if not tools:
             break
-        cand, covered = max(tools.values(), key=lambda t: (t[0].setup_complexity != "developer", len(t[1]),
+        cand, covered = max(tools.values(), key=lambda t: (t[0].setup_complexity != "developer", _fit_rank(t[0]) < 2, len(t[1]),
                                                            t[0].vetted, -_min_cost(t[0], intake)))
         for cid in covered:
             picks[cid] = cand
@@ -80,18 +90,30 @@ def alternatives_for(comp, chosen_id, cands_by, intake: Intake) -> list[dict]:
         rows.append({"tool_id": c.tool_id, "name": c.name, "source": "owned" if _covered_by_owned(c) else c.source,
                      "vetted": c.vetted, "plan_name": plan, "monthly_cost": cost,
                      "site": c.site, "pricing_source_url": c.pricing_source_url,
-                     "setup_complexity": c.setup_complexity, "best_for": c.best_for or c.audience})
+                     "setup_complexity": c.setup_complexity, "best_for": c.best_for or c.audience,
+                     "fit": c.fit, "fit_reason": c.fit_reason})
     return sorted(rows, key=lambda r: (r["setup_complexity"] == "developer", r["monthly_cost"] is None,
                                        r["monthly_cost"] or 0, r["name"]))
 
 
-def build_option(option_id, title, summary, components, picks, intake: Intake, cands_by=None) -> Option:
+SKIP_CHOICES = {"skip": ("skipped", "Skipped for now", "Not needed right now; no tool and no cost."),
+                "have": ("existing", "Using what you already have", "Covered by software or a process you already have.")}
+
+
+def build_option(option_id, title, summary, components, picks, intake: Intake, cands_by=None, skipped=None) -> Option:
     usage = intake.usage
     tool_costs: dict[str, float | None] = {}
     tool_plan: dict[str, tuple[str | None, list[str]]] = {}
     assignments, assumptions, setup, sources, unvetted = [], [], [], [], []
+    skipped = skipped or {}
 
     for comp in components:
+        if comp.id in skipped:  # the owner chose "Skip" or "I already have this" for this need
+            source, label, basis = SKIP_CHOICES[skipped[comp.id]]
+            assignments.append(Assignment(component_id=comp.id, capability=comp.capability, description=comp.description,
+                                          tool_id=None, tool_name=label, source=source, vetted=True,
+                                          monthly_cost=0.0, cost_basis=basis))
+            continue
         native = _native(comp, picks)
         cand = picks.get(comp.id)
         if native:
@@ -141,7 +163,7 @@ def build_option(option_id, title, summary, components, picks, intake: Intake, c
             site_url=cand.site, pricing_source_url=cand.pricing_source_url,
             pricing_checked_at=cand.pricing_checked_at, tool_description=cand.description,
             setup_complexity=cand.setup_complexity,
-            best_for=cand.best_for or cand.audience,
+            best_for=cand.best_for or cand.audience, fit=cand.fit, fit_reason=cand.fit_reason,
             alternatives=alternatives_for(comp, cand.tool_id, cands_by or {}, intake)))
 
     total, complete, within = option_total(tool_costs, intake.monthly_budget)
@@ -159,6 +181,8 @@ def build_option(option_id, title, summary, components, picks, intake: Intake, c
 
 def build_options(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake) -> list[Option]:
     strategies = [
+        ("Best fit", "Tools made for each job in your kind of business, cheapest among equally good fits.",
+         strategy_lowest_cost(components, cands_by, intake, best_fit=True)),
         ("Lowest monthly cost", "The cheapest combination that covers each part of your problem.",
          strategy_lowest_cost(components, cands_by, intake)),
         ("Fewest tools", "Covers as much as possible with one product, so there is less to set up and connect.",
@@ -185,10 +209,102 @@ def build_options(components: list[Component], cands_by: dict[str, list[Candidat
         # An option with a part left uncovered can't be acted on, so it is not offered.
         if any(a.source == "none" for a in option.assignments):
             continue
+        # Nor is one that steers the owner to a tool not designed for a need when a better-suited tool exists;
+        # such tools stay visible, clearly labelled, in that need's list.
+        if any(a.fit == "poor" and any(_fit_rank(c) < 2 for c in cands_by.get(a.component_id, []))
+               for a in option.assignments):
+            continue
         options.append(option)
     # Options a small business can set up without developers first, then within budget, then cheapest.
-    options.sort(key=lambda o: (any(a.setup_complexity == "developer" for a in o.assignments),
-                                o.within_budget is not True, o.monthly_total if o.monthly_total is not None else INF))
+    # "Best fit" leads (it supplies the default picks) unless it is over budget; then by fit, budget and price.
+    def order(o):
+        fit = sum(FIT_RANK.get(a.fit, 1) for a in o.assignments if a.source not in ("native", "skipped", "existing"))
+        best_first = 0 if o.title == "Best fit" and o.within_budget is not False else 1
+        return (any(a.setup_complexity == "developer" for a in o.assignments), best_first, o.within_budget is not True,
+                fit, o.monthly_total if o.monthly_total is not None else INF)
+    options.sort(key=order)
     for i, opt in enumerate(options, start=1):
         opt.id = f"opt{i}"
     return options[:3]
+
+
+VOLUME_UNITS = {"monthly_bookings": "bookings", "monthly_calls": "calls", "monthly_messages": "messages",
+                "monthly_minutes": "call minutes", "monthly_tasks": "automated tasks"}
+
+
+def pricing_questions(options: list[Option], cands_by: dict[str, list[Candidate]], intake: Intake, limit=2) -> list[dict]:
+    """Questions asked after research, only when a shown plan's price depends on the answer."""
+    by_tool = {c.tool_id: c for lst in cands_by.values() for c in lst}
+    questions, asked = [], set()
+    for option in options:
+        for a in option.assignments:
+            cand = by_tool.get(a.tool_id)
+            plan = next((p for p in cand.plans if p.name == a.plan_name), None) if cand else None
+            if plan is None or a.source == "owned":
+                continue
+            if intake.usage.monthly_volume is None and "monthly_volume" not in asked:
+                key = next((k for k in VOLUME_UNITS if plan.included.get(k)), None)
+                if key:
+                    asked.add("monthly_volume")
+                    questions.append({"id": "pq_volume", "field": "monthly_volume", "tool": cand.name,
+                                      "question": f"About how many {VOLUME_UNITS[key]} a month do you expect? "
+                                                  f"{cand.name}'s {plan.name} plan includes up to "
+                                                  f"{plan.included[key]:,}, so the price may change."})
+            if intake.usage.contacts is None and "contacts" not in asked and plan.included.get("contacts"):
+                asked.add("contacts")
+                questions.append({"id": "pq_contacts", "field": "contacts", "tool": cand.name,
+                                  "question": f"About how many contacts will you store? {cand.name}'s {plan.name} "
+                                              f"plan includes up to {plan.included['contacts']:,}."})
+            if plan.per_seat and intake.usage.seats == 1 and "seats" not in asked:
+                asked.add("seats")
+                questions.append({"id": "pq_seats", "field": "seats", "tool": cand.name,
+                                  "question": f"How many people will use {cand.name}? It is priced per person "
+                                              f"and we have assumed 1."})
+    return questions[:limit]
+
+
+def component_tools(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake) -> dict[str, list[dict]]:
+    """Every tool found for each need, priced in code, with the other needs the same tool also fits."""
+    fits = {}
+    for comp in components:
+        for c in cands_by.get(comp.id, []):
+            fits.setdefault(c.tool_id, []).append(comp.id)
+    out = {}
+    for comp in components:
+        rows = []
+        for c in cands_by.get(comp.id, []):
+            if _covered_by_owned(c):
+                plan, cost = "Your current plan", 0.0
+            else:
+                choice = choose_plan(c.plans, intake.usage)
+                plan, cost = (choice.plan.name if choice.plan else None), choice.monthly_cost
+            rows.append({"tool_id": c.tool_id, "name": c.name, "source": "owned" if _covered_by_owned(c) else c.source,
+                         "vetted": c.vetted, "plan_name": plan, "monthly_cost": cost,
+                         "setup_complexity": c.setup_complexity, "best_for": c.best_for or c.audience,
+                         "site": c.site, "pricing_source_url": c.pricing_source_url,
+                         "description": c.description, "also_fits": [cid for cid in fits[c.tool_id] if cid != comp.id],
+                         "fit": c.fit, "fit_reason": c.fit_reason})
+        # Purpose first: tools made for this job lead, then price.
+        out[comp.id] = sorted(rows, key=lambda r: (r["setup_complexity"] == "developer", FIT_RANK.get(r["fit"], 1),
+                                                   r["monthly_cost"] is None, r["monthly_cost"] or 0, r["name"]))
+    return out
+
+
+def build_selection(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake,
+                    selections: dict[str, str]) -> Option:
+    """Price the owner's own picks: a tool id per need, or "skip" / "have". Prices come from code, never the browser."""
+    picks, skipped = {}, {}
+    for comp in components:
+        choice = selections.get(comp.id)
+        if choice in SKIP_CHOICES:
+            skipped[comp.id] = choice
+            continue
+        if choice is None:
+            picks[comp.id] = None
+            continue
+        match = next((c for c in cands_by.get(comp.id, []) if c.tool_id == choice), None)
+        if match is None:
+            raise ValueError(f"That tool isn't one of the options found for '{comp.description}'.")
+        picks[comp.id] = match
+    return build_option("custom", "Your selection", "The tools you picked for each need.", components, picks,
+                        intake, cands_by, skipped)

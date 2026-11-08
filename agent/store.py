@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS discovered_tools (
     pricing_source_url TEXT, status TEXT NOT NULL DEFAULT 'unvetted',
     first_seen TEXT NOT NULL, last_checked TEXT NOT NULL, times_seen INTEGER NOT NULL DEFAULT 1,
     audience TEXT, setup_complexity TEXT, best_for TEXT, mentions INTEGER DEFAULT 0, small_business_fit INTEGER);
+CREATE TABLE IF NOT EXISTS fit_cache (
+    key TEXT PRIMARY KEY, fit TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS research_cache (
     run_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, payload TEXT NOT NULL,
     PRIMARY KEY (run_id, kind, key));
@@ -186,6 +188,28 @@ class Store:
                         "VALUES (?,?,?,?,?,?)", (run_id, project_id, "queued", "queued", ts, ts))
         return version, run_id
 
+    def start_followup_run(self, project_id, seed: dict):
+        """Start a run that reuses the current parts (no new breakdown), e.g. a user-requested search
+        for more tools. Supersedes an unapproved waiting plan; refused once a plan is approved."""
+        run_id, ts = new_id("run"), now_iso()
+        with self.tx() as con:
+            last = con.execute("SELECT id, status FROM agent_runs WHERE project_id=? "
+                               "ORDER BY created_at DESC, rowid DESC LIMIT 1", (project_id,)).fetchone()
+            if not last:
+                raise RunActive("No existing consultation run was found.")
+            if last["status"] in ("queued", "running", "waiting_input"):
+                raise RunActive("Please wait until the current search finishes.")
+            approved = con.execute("SELECT 1 FROM approvals a JOIN plans p ON p.id = a.plan_id "
+                                   "WHERE p.project_id=? ORDER BY p.version DESC LIMIT 1", (project_id,)).fetchone()
+            if approved:
+                raise RunActive("This plan is already approved.")
+            if last["status"] == "waiting_approval":
+                con.execute("UPDATE agent_runs SET status='superseded', updated_at=? WHERE id=?", (ts, last["id"]))
+            con.execute("INSERT INTO agent_runs(id, project_id, status, step, snapshot, created_at, updated_at) "
+                        "VALUES (?,?,?,?,?,?,?)", (run_id, project_id, "queued", "queued",
+                                                   json.dumps({"seed": seed}), ts, ts))
+        return run_id
+
     def get_run(self, run_id):
         with self.connect() as con:
             row = con.execute("SELECT * FROM agent_runs WHERE id=?", (run_id,)).fetchone()
@@ -271,8 +295,11 @@ class Store:
         plan["payload"] = json.loads(plan["payload"])
         return plan
 
-    def approve(self, project_id, plan_version, option_id, max_build_budget, idempotency_key, authorized_actions):
-        """Record the approval exactly once. Returns (approval, created)."""
+    def approve(self, project_id, plan_version, option_id, max_build_budget, idempotency_key, authorized_actions,
+                custom_option=None):
+        """Record the approval exactly once. Returns (approval, created).
+
+        custom_option is an option the server priced from the owner's own selections (option_id "custom")."""
         with self.tx() as con:
             same_key = con.execute("SELECT * FROM approvals WHERE project_id=? AND idempotency_key=?",
                                    (project_id, idempotency_key)).fetchone()
@@ -294,6 +321,8 @@ class Store:
                     return existing, False
                 raise AlreadyApproved(existing)
             options = {o["id"]: o for o in json.loads(plan["payload"])["options"]}
+            if custom_option is not None:
+                options[custom_option["id"]] = custom_option
             if option_id not in options:
                 raise UnknownOption("Choose one of the listed options.")
             option = options[option_id]
@@ -301,7 +330,8 @@ class Store:
                     or any(a["source"] == "none" for a in option["assignments"])):
                 raise UnknownOption("This option has unresolved tools or prices. Refine your request before approving.")
             recurring = {"monthly_total": option["monthly_total"], "total_is_complete": option["total_is_complete"],
-                         "tools": [{"tool": a["tool_name"], "plan": a["plan_name"], "monthly_cost": a["monthly_cost"]}
+                         "tools": [{"tool": a["tool_name"], "plan": a["plan_name"], "monthly_cost": a["monthly_cost"],
+                                    "need": a.get("description", ""), "choice": a["source"]}
                                    for a in option["assignments"]], "assumptions": option["assumptions"]}
             approval_id = new_id("apr")
             con.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?,?)",
@@ -388,6 +418,15 @@ class Store:
                 tool[key] = json.loads(tool[key])
             tools.append(tool)
         return tools
+
+    def save_fit(self, key, fit, reason):
+        with self.tx() as con:
+            con.execute("INSERT OR REPLACE INTO fit_cache VALUES (?,?,?,?)", (key, fit, reason, now_iso()))
+
+    def get_fit(self, key):
+        with self.connect() as con:
+            row = con.execute("SELECT fit, reason FROM fit_cache WHERE key=?", (key,)).fetchone()
+        return (row["fit"], row["reason"]) if row else None
 
     def cache_get(self, run_id, kind, key):
         with self.connect() as con:

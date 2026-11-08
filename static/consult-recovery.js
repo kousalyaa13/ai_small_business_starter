@@ -42,8 +42,7 @@
     panel.hidden = !plan || !recovery || !!approved || (usable && !globalThis.bloomRecoveryOpen);
     panel.classList.toggle('has-matches', usable);
     if (panel.hidden) return;
-    $('options').hidden = noneFound || !!globalThis.bloomCompareActive;
-    $('compare-view').hidden = noneFound || !globalThis.bloomCompareActive;
+    $('options').hidden = noneFound && !(data?.components || []).length;
     $('approve-line').hidden = noneFound || data.run?.status !== 'waiting_approval';
 
     // Never allow approving a placeholder gap or a plan with an unknown total.

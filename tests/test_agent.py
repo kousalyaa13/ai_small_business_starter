@@ -6,7 +6,7 @@ from pathlib import Path
 from agent.llm import StubModel
 from agent.runner import InlineExecutor
 from agent.safe_fetch import FetchError
-from agent.schemas import Answers, ApprovalRequest, Intake, Usage, RevisionRequest
+from agent.schemas import Answers, ApprovalRequest, Intake, ResearchRequest, RevisionRequest, Usage
 from agent.service import AgentService, Conflict
 from agent.store import RunActive
 
@@ -38,8 +38,9 @@ class WorkflowTests(unittest.TestCase):
         project_id, run_id = svc.start(Intake(problem_text=EXAMPLE))
         status = svc.status(project_id)
         self.assertEqual(status["run"]["status"], "waiting_input")
-        self.assertEqual({q["field"] for q in status["questions"]}, {"monthly_budget", "monthly_volume"})
-        svc.answer(project_id, Answers(answers={"q_budget": "$30", "q_volume": "200"}))
+        # Only the budget is asked up front; volume is asked later, if a shown plan's price depends on it.
+        self.assertEqual({q["field"] for q in status["questions"]}, {"monthly_budget"})
+        svc.answer(project_id, Answers(answers={"q_budget": "$30"}))
         status = svc.status(project_id)
         self.assertEqual(status["run"]["status"], "waiting_approval")
         self.assertEqual(status["requirement_version"], 2)
@@ -143,8 +144,11 @@ class WorkflowTests(unittest.TestCase):
         svc = make_service(self.tmp.name)
         project_id, _ = svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=50)))
         usage = svc.status(project_id)["usage"]
-        self.assertEqual(usage["model_calls"], 1)
+        self.assertEqual(usage["model_calls"], 2)  # breakdown + one batched fit rating
         self.assertGreater(usage["tokens"], 0)
+        # The same need for the same business type reuses cached fit ratings: no second rating call.
+        again, _ = svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=50)))
+        self.assertEqual(svc.status(again)["usage"]["model_calls"], 1)
 
 
 class DiscoveryReuseTests(unittest.TestCase):
@@ -232,6 +236,182 @@ class NoCompleteOptionTests(unittest.TestCase):
             self.assertEqual(status["plan"]["gaps"], ["Answer incoming phone calls and capture caller details"])
             with self.assertRaises(ValueError):
                 svc.approve(pid, ApprovalRequest(plan_version=1, option_id="opt1", idempotency_key="key-zzzzzz"))
+
+
+class FitDrivenResearchTests(unittest.TestCase):
+    def test_need_covered_only_by_workable_tools_is_researched(self):
+        from agent.research import SearchResult
+        page = ("<html><head><title>TableBook</title></head><body><p>TableBook lets customers book restaurant tables "
+                "and appointments online and sends reminders for small restaurants.</p><p>Starter: $39/month</p></body></html>")
+        search = ResearchMoreTests.Search([SearchResult("TableBook", "https://tablebook.example/", "")])
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = make_service(tmp, search=search, fetcher=ResearchMoreTests.Fetcher({"https://tablebook.example/": page}))
+            pid, _ = svc.start(Intake(problem_text="We need online booking for table reservations.",
+                                      business_type="restaurant", monthly_budget=100))
+            status = svc.status(pid)
+        booking = [c for c in status["components"] if c["capability"] == "appointment_booking"][0]
+        self.assertTrue(search.queries)  # Calendly/Jobber are only "workable" for a restaurant, so research ran
+        self.assertTrue(any("weren't built for it" in n for n in status["research_notes"]))
+        tools = {t["name"]: t for t in booking["tools"]}
+        self.assertIn("TableBook", tools)
+        self.assertEqual(tools["TableBook"]["fit"], "built_for_this")
+        self.assertEqual(booking["tools"][0]["name"], "TableBook")  # purpose first in the list
+
+
+class BuiltForThisModel(StubModel):
+    """Stand-in that rates every known tool as built for the job, so the catalog fully covers the needs."""
+
+    def structured(self, task, instructions, content, schema):
+        from agent.schemas import FitAssessment, FitAssessments
+        if schema is FitAssessments:
+            import re
+            keys = re.findall(r"^\[(\w+)\]", content, re.M)
+            return FitAssessments(assessments=[FitAssessment(key=k, fit="built_for_this", reason="Made for this.")
+                                               for k in keys]), super().structured(task, instructions, "x", schema)[1]
+        return super().structured(task, instructions, content, schema)
+
+
+class ResearchMoreTests(unittest.TestCase):
+    """The user can ask for cheaper or better tools even when known tools already cover a part."""
+
+    PAGE = ("<html><head><title>LeadBox CRM</title></head><body><p>LeadBox is a simple CRM that stores customer "
+            "contact records and leads for small businesses.</p><p>Solo: $9/month</p></body></html>")
+
+    class Search:
+        provider = "fake"
+
+        def __init__(self, results):
+            self.results, self.queries = results, []
+
+        def search(self, query, count=8):
+            self.queries.append(query)
+            return self.results
+
+    class Fetcher:
+        def __init__(self, pages):
+            self.pages = pages
+
+        def fetch(self, url):
+            from agent.safe_fetch import page_from_html
+            if url not in self.pages:
+                raise FetchError("not found")
+            return page_from_html(url, self.pages[url])
+
+    def setUp(self):
+        from agent.research import SearchResult
+        self.tmp = tempfile.TemporaryDirectory()
+        self.search = self.Search([SearchResult("LeadBox CRM", "https://leadbox.example/", "")])
+        self.svc = make_service(self.tmp.name, search=self.search, model=BuiltForThisModel(),
+                                fetcher=self.Fetcher({"https://leadbox.example/": self.PAGE}))
+        self.pid, _ = self.svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, business_type="plumbing",
+                                            usage=Usage(monthly_volume=100)))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def crm_part(self, status):
+        return [c for c in status["components"] if c["capability"] == "crm_contacts"][0]
+
+    def test_search_finds_new_tools_for_a_covered_part(self):
+        first = self.svc.status(self.pid)
+        self.assertEqual(first["run"]["status"], "waiting_approval")
+        self.assertEqual(self.search.queries, [])  # the catalog covered everything, so no search ran
+        crm = self.crm_part(first)
+        self.assertEqual(crm["match"], "catalog")
+
+        self.svc.research_more(self.pid, ResearchRequest(component_ids=[crm["id"]]))
+        second = self.svc.status(self.pid)
+        self.assertEqual(second["run"]["status"], "waiting_approval")
+        self.assertEqual(second["plan"]["version"], first["plan"]["version"] + 1)
+        self.assertIn("LeadBox CRM", [c["name"] for c in self.crm_part(second)["candidates"]])
+        self.assertIn("HubSpot", [c["name"] for c in self.crm_part(second)["candidates"]])  # existing tools kept
+        # Only the chosen part was searched, with goal-directed queries for alternatives.
+        self.assertTrue(any("alternatives for plumbing" in q for q in self.search.queries))
+        self.assertTrue(any("affordable" in q for q in self.search.queries))
+        self.assertTrue(any("new tool" in n for n in second["research_notes"]))
+        with self.assertRaises(Conflict):  # the previous plan version can no longer be approved
+            self.svc.approve(self.pid, ApprovalRequest(plan_version=first["plan"]["version"], option_id="opt1",
+                                                       idempotency_key="old-version-key"))
+
+    def test_no_search_after_approval_and_bad_part_rejected(self):
+        status = self.svc.status(self.pid)
+        with self.assertRaises(ValueError):
+            self.svc.research_more(self.pid, ResearchRequest(component_ids=["c99"]))
+        self.svc.approve(self.pid, ApprovalRequest(plan_version=status["plan"]["version"], option_id="opt1",
+                                                   idempotency_key="approve-now-key"))
+        with self.assertRaises(Conflict):
+            self.svc.research_more(self.pid, ResearchRequest())
+
+    def test_pricing_answers_are_applied_through_revise(self):
+        self.svc.revise(self.pid, RevisionRequest(monthly_volume=500, contacts=2000))
+        status = self.svc.status(self.pid)
+        self.assertEqual((status["intake"]["usage"]["monthly_volume"], status["intake"]["usage"]["contacts"]), (500, 2000))
+
+    def test_owner_selection_can_be_previewed_and_saved(self):
+        status = self.svc.status(self.pid)
+        ids = {c["capability"]: c["id"] for c in status["components"]}
+        self.assertTrue(all(c.get("tools") for c in status["components"] if c["capability"] != "workflow_automation"))
+        picks = {ids["form_capture"]: "have", ids["crm_contacts"]: "jobber", ids["workflow_automation"]: "zapier"}
+        preview = self.svc.price_selection(self.pid, picks)
+        self.assertEqual((preview.id, preview.monthly_total), ("custom", 49.0))
+        approval, created = self.svc.approve(self.pid, ApprovalRequest(plan_version=status["plan"]["version"],
+                                                                      option_id="custom", selections=picks,
+                                                                      idempotency_key="custom-pick-key"))
+        self.assertTrue(created)
+        self.assertEqual(approval["option_id"], "custom")
+        self.assertEqual(approval["recurring_cost"]["monthly_total"], 49.0)
+        self.assertEqual([t["choice"] for t in approval["recurring_cost"]["tools"]], ["existing", "catalog", "catalog"])
+        self.assertEqual(self.svc.status(self.pid)["run"]["status"], "completed")
+
+    def test_selection_endpoint(self):
+        import app as project
+        flask_app = project.app
+        original = flask_app.extensions["agent_service"]
+        flask_app.extensions["agent_service"] = self.svc
+        try:
+            client = flask_app.test_client()
+            status = client.get(f"/api/projects/{self.pid}").get_json()
+            crm = [c for c in status["components"] if c["capability"] == "crm_contacts"][0]
+            r = client.post(f"/api/projects/{self.pid}/selection", json={"selections": {crm["id"]: "jobber"}})
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json()["option"]["id"], "custom")
+            bad = client.post(f"/api/projects/{self.pid}/selection", json={"selections": {crm["id"]: "nope"}})
+            self.assertEqual(bad.status_code, 400)
+        finally:
+            flask_app.extensions["agent_service"] = original
+
+    def test_status_reports_which_need_is_being_searched(self):
+        status = self.svc.status(self.pid)
+        crm = [c for c in status["components"] if c["capability"] == "crm_contacts"][0]
+        run_id = self.svc.store.start_followup_run(self.pid, {"components": status["components"],
+                                                              "force_research": [crm["id"]], "goal": "both"})
+        searching = self.svc.status(self.pid)
+        self.assertEqual(searching["run"]["status"], "queued")
+        self.assertEqual(searching["run"]["researching"], [crm["id"]])
+        self.assertEqual(searching["plan"]["version"], status["plan"]["version"])  # current options stay visible
+        self.svc.runner.drive(run_id)
+        self.assertEqual(self.svc.status(self.pid)["run"]["researching"], [])
+
+    def test_approval_blocked_while_search_runs(self):
+        status = self.svc.status(self.pid)
+        with self.svc.store.tx() as con:  # simulate a follow-up search in progress
+            con.execute("UPDATE agent_runs SET status='running' WHERE id=?", (status["run"]["id"],))
+        with self.assertRaises(Conflict):
+            self.svc.approve(self.pid, ApprovalRequest(plan_version=status["plan"]["version"], option_id="opt1",
+                                                       idempotency_key="during-search-key"))
+
+    def test_research_endpoint(self):
+        import app as project
+        flask_app = project.app
+        original = flask_app.extensions["agent_service"]
+        flask_app.extensions["agent_service"] = self.svc
+        try:
+            client = flask_app.test_client()
+            self.assertEqual(client.post(f"/api/projects/{self.pid}/research", json={"component_ids": ["nope"]}).status_code, 400)
+            self.assertEqual(client.post(f"/api/projects/{self.pid}/research", json={"goal": "cheaper"}).status_code, 202)
+            self.assertEqual(client.post(f"/api/projects/{self.pid}/research", json={"goal": "fastest"}).status_code, 400)
+        finally:
+            flask_app.extensions["agent_service"] = original
 
 
 class ApiTests(unittest.TestCase):

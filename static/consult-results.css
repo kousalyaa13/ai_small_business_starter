@@ -75,21 +75,6 @@
 .setup-budget-control{margin-top:12px;border-top:1px solid #edf1f6;padding-top:11px}
 .setup-budget-control summary{font-size:12px;font-weight:750;color:#64758b}
 .setup-budget-control label{margin-top:10px}
-#compare-view{margin-top:20px}
-.compare-scroll{overflow-x:auto;border:1px solid #e0e7f0;border-radius:13px}
-.compare-table{width:100%;border-collapse:collapse;min-width:640px;background:#fff;font-size:12px}
-.compare-table th,.compare-table td{padding:14px 12px;text-align:left;border-bottom:1px solid #e9eef4;vertical-align:middle}
-.compare-table thead th{background:#f4f7fc;color:#2c415d;font-weight:850}
-.compare-table tbody th{width:28%;font-weight:750;color:#51627b}
-.compare-table tbody tr:nth-child(even){background:#fafbfd}
-.compare-product{display:grid;gap:8px}.compare-product>div{display:flex;align-items:center;gap:8px}
-.compare-product small{display:block;color:#79879a;font-size:11px;font-weight:500;margin-top:3px}
-.compare-product .product-icon{width:30px;height:30px;border-radius:8px}
-.compare-product .product-icon img{width:22px;height:22px;inset:3px}
-.compare-product .product-initial{font-size:13px}
-.compare-yes{color:#0a866b;font-weight:750}.compare-no{color:#a66343}
-.compare-choose{font-size:12px;padding:9px 12px}
-.compare-footnote{margin-top:10px}
 .recovery.has-matches{background:#f9fbff;border-color:#d8e4f3;padding:18px}
 .recovery.has-matches .recovery-symbol{background:#e8efff;color:#3c64bf}
 .recovery.has-matches .recovery-head h3{font-size:17px}
@@ -100,3 +85,52 @@
 @media(max-width:500px){.option.result-card{padding:18px}.product-name{font-size:22px}.result-price strong{font-size:30px}.detail-tabs button{padding:8px 7px}.consultation-status{padding:18px}.results-actions .btn{width:100%}}
 
 .result-price.price-neutral strong{font-size:26px;letter-spacing:-.5px;overflow-wrap:anywhere}
+
+/* "Find cheaper or better options" and the other tools found for a need */
+.more-options{margin-top:12px;padding-top:10px;border-top:1px dashed #dfe5ee;display:grid;gap:8px;font-size:12px}
+.more-options-list summary{cursor:pointer;font-weight:800;color:#465f84}
+.more-options-list ul{margin:6px 0 0;padding-left:18px}.more-options-list li{margin:3px 0;color:#4d5b70}
+.research-btn{justify-self:start;border:1px solid #c9d6ef;background:#f4f7fe;color:#2f4f8f;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer}
+.research-btn:hover{background:#e9effd}.research-btn:disabled{opacity:.55;cursor:default}
+
+/* Pricing questions asked after research */
+.pricing-questions{border:1px solid #e8dcc0;background:#fffaf0;border-radius:14px;padding:14px 16px;margin-bottom:14px;display:grid;gap:10px}
+.pricing-questions h3{margin:0;font-size:14px}.pricing-questions .field{font-size:13px}.pricing-questions .btn{justify-self:start}
+
+/* Needs picker: one row per need, with every tool found for it */
+.needs-picker{display:grid;gap:10px}
+.need-pick{border:1px solid #e0e7f0;border-radius:14px;background:#fff}
+.need-pick>summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:14px 16px}
+.need-pick>summary::-webkit-details-marker{display:none}
+.need-pick>summary:after{content:"▾";color:#7a889c;transition:transform .15s}.need-pick[open]>summary:after{transform:rotate(180deg)}
+.need-pick>summary{grid-template-columns:1fr auto auto 14px}
+.need-name{font-weight:800;color:#24364f;font-size:14px}
+.need-choice{font-size:13px;font-weight:750;color:#2f4f8f;text-align:right}
+.need-count{font-size:11px;color:#7a889c;white-space:nowrap}
+.need-body{padding:0 16px 16px;display:grid;gap:8px}
+.tool-choice{display:grid;grid-template-columns:18px 1fr;gap:4px 10px;align-items:start;border:1px solid #e6ebf2;border-radius:11px;padding:10px 12px;cursor:pointer}
+.tool-choice input{margin-top:3px;accent-color:#345fe7;grid-row:span 4}
+.tool-choice.selected{border-color:#345fe7;background:#f3f6ff}
+.tool-choice-main{grid-column:2;display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.tool-choice-price{font-weight:750;color:#33465f;white-space:nowrap}
+.tool-choice-meta{grid-column:2;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:11px;color:#6a788c}
+.need-tag{font-size:10px;font-weight:800;border-radius:999px;padding:2px 7px;background:#eef1f6;color:#4f5d72}
+.need-tag.dev{background:#fdeceb;color:#a62f42}.need-tag.new{background:#e4f6ef;color:#0b6a50}
+.share-suggest{background:#f4f7fe;border:1px solid #c9d6ef;border-radius:11px;padding:10px 12px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.link-btn{border:0;background:transparent;color:#5b6b82;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline}
+.research-status{margin:0;background:#fffaf0;border:1px solid #f0dfb8;border-radius:11px;padding:10px 12px;font-size:12px;color:#7a5418}
+.selection-bar{position:sticky;bottom:12px;margin-top:14px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid #d9e2ef;border-radius:14px;padding:14px 16px;box-shadow:0 6px 18px rgba(22,35,54,.08)}
+.selection-bar strong{font-size:22px}.selection-bar p{margin:4px 0 0;max-width:520px}
+.selection-actions{display:grid;gap:8px;justify-items:end}
+.quick-picks{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.quick-pick{border:1px solid #d9e0ea;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:750;color:#3b4b60;cursor:pointer}
+.quick-pick:hover{background:#f4f7fc}
+@media(max-width:640px){.need-pick>summary{grid-template-columns:1fr 14px}.need-choice,.need-count{grid-column:1;text-align:left}.selection-actions{justify-items:start}}
+.tool-choice-pitch{grid-column:2;font-size:12px;color:#46546a;line-height:1.4}
+.need-tag.cheaper{background:#e7ebff;color:#2f4f8f}
+.research-result{background:#eefaf4;border:1px solid #c5e8d6;border-radius:11px;padding:10px 12px;font-size:12px;color:#1d5c45}
+.research-result.failed{background:#fdf0ef;border-color:#f1c9c4;color:#8f2a1b}
+.need-pick.is-searching{border-color:#f0dfb8}.need-pick.is-searching .need-choice{color:#9b611e}
+.tool-fit{grid-column:2;font-size:12px;line-height:1.4;border-radius:8px;padding:5px 8px}
+.tool-fit.fit-good{background:#eaf7f1;color:#155c45}.tool-fit.fit-ok{background:#fff6e5;color:#7a5418}
+.tool-fit.fit-poor{background:#fdeeed;color:#8f2a1b}
