@@ -137,8 +137,9 @@ const NO_OPTION='no_complete_option';
 // Public landing-page choices prefill context without starting or submitting a project.
 const landingContext=new URLSearchParams(window.location.search);
 const suggestedProblems={admin:'We spend too much time on repetitive paperwork and manual tasks. Help us identify a practical workflow to simplify.',finance:'We need to manage our operating expenses, track budgets, and compare software costs before investing.',marketing:'We want to reach more potential customers and grow sales without wasting money on the wrong software.',support:'We are struggling to keep up with customer questions and follow-up requests.',scheduling:'Our appointment scheduling and booking processes create missed handoffs and extra admin work.',retention:'We want to encourage repeat customers and keep better track of customer relationships.'};
-const challenge=landingContext.get('challenge');
-if(challenge&&Object.hasOwn(suggestedProblems,challenge))document.querySelector('#intake-form [name="problem_text"]').value=suggestedProblems[challenge];
+const challenges=[...new Set(landingContext.getAll('challenge'))].filter(id=>Object.hasOwn(suggestedProblems,id)).slice(0,3);
+const challenge=challenges[0]||null;
+if(challenges.length){document.querySelector('#intake-form [name="problem_text"]').value=challenges.map(id=>suggestedProblems[id]).join('\n\n');}
 const industry=landingContext.get('industry');
 const industryExamples={
  restaurant:{type:'restaurant or café',problem:'We run a busy café or restaurant and struggle to keep reservations, staff schedules, and customer follow-ups organized. We want to reduce manual coordination, avoid missed bookings, and find an affordable tool that fits our daily operations.'},
@@ -153,7 +154,7 @@ const industryExamples={
 if(industry&&Object.hasOwn(industryExamples,industry)){
  const example=industryExamples[industry];
  document.querySelector('#intake-form [name="business_type"]').value=example.type;
- if(!challenge||!Object.hasOwn(suggestedProblems,challenge)){
+ if(!challenges.length){
   document.querySelector('#intake-form [name="problem_text"]').value=example.problem;
  }
 }

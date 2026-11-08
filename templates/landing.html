@@ -38,26 +38,37 @@
  </div>
  <div class="container"><div class="hero-bottom"><span>BUILT FOR REAL SMALL-BUSINESS NEEDS</span><span>One step at a time <span aria-hidden="true">↗</span></span></div></div>
 </section>
-<section class="section reveal industries-section" id="industries">
+<section class="section reveal starter-section" id="industries">
  <div class="container">
-  <div class="section-heading-row"><div><span class="eyebrow dark">FIND YOUR STARTING POINT</span><h2>Every business<br><em>grows differently.</em></h2></div><p>Choose your industry to start with a relevant, editable example.</p></div>
-  <div class="industry-grid">
-   {% for industry in content.industries %}
-    <a class="industry-card" href="/consult?industry={{ industry.id }}"><div class="industry-image"><img src="{{ industry.image }}" alt="{{ industry.alt }}" loading="lazy"></div><div class="industry-info"><div><h3>{{ industry.title }}</h3><p>{{ industry.description }}</p></div><span class="industry-link" aria-hidden="true">↗</span></div></a>
-   {% endfor %}
-  </div>
- </div>
-</section>
-<section class="section reveal challenges-section" id="challenges">
- <div class="container">
-  <div class="section-head centered"><span class="eyebrow dark">PLANT YOUR FIRST SEED</span><h2>What's holding back<br><em>your growth?</em></h2><p>Pick one challenge. We'll help you explore a practical next step.</p></div>
-  <form class="challenge-picker" id="challenge-form">
-   <fieldset><legend class="visually-hidden">Choose your biggest business challenge</legend><div class="challenge-grid" id="challenge-options">
-   {% for challenge in content.challenges %}
-    <label class="challenge-option"><input type="radio" name="challenge" value="{{ challenge.id }}" {% if loop.first %}checked{% endif %}><span class="challenge-body"><span class="challenge-icon" aria-hidden="true">{{ challenge.icon }}</span><span class="challenge-name">{{ challenge.title }}</span><span class="challenge-desc">{{ challenge.description }}</span><span class="challenge-arrow" aria-hidden="true">↗</span></span></label>
-   {% endfor %}
-   </div></fieldset>
-   <div class="challenge-submit"><button class="button primary" type="submit">Find my growth plan <span aria-hidden="true">→</span></button></div>
+  <div class="starter-heading"><span class="eyebrow dark">PLANT YOUR FIRST SEED</span><h2>Where should we help<br><em>your business grow?</em></h2><p>Choose your industry and up to three challenges. We'll use them to start a growth plan you can personalize.</p></div>
+  <form class="starter-builder" id="growth-plan-form" action="/consult" method="get">
+   <aside class="starter-sidebar" aria-label="Choose what to explore">
+    <span class="starter-sidebar-label">YOUR STARTING POINT</span>
+    <button type="button" class="starter-tab is-active" data-starter-tab="industry" aria-controls="starter-industry-panel" aria-selected="true"><span class="starter-tab-icon" aria-hidden="true">⌂</span><span><strong>View by industry</strong><small>What kind of business?</small></span><span class="starter-tab-arrow" aria-hidden="true">→</span></button>
+    <button type="button" class="starter-tab" data-starter-tab="problems" aria-controls="starter-problems-panel" aria-selected="false"><span class="starter-tab-icon" aria-hidden="true">✦</span><span><strong>View by problems</strong><small>What needs to improve?</small></span><span class="starter-tab-arrow" aria-hidden="true">→</span></button>
+    <div class="starter-sidebar-note"><span aria-hidden="true">✿</span><p>Every business blooms differently. Start anywhere and mix both.</p></div>
+   </aside>
+   <div class="starter-main">
+    <div class="starter-panel" id="starter-industry-panel">
+     <div class="starter-panel-head"><div><span class="starter-step">01 / YOUR BUSINESS</span><h3>Pick your industry</h3><p>Select one. You can change it anytime.</p></div><span class="starter-count" id="industry-count">0 of 1 selected</span></div>
+     <fieldset class="starter-fieldset"><legend class="visually-hidden">Choose one industry</legend><div class="starter-industry-grid">
+      {% for industry in content.industries %}
+      <label class="starter-industry-choice"><input type="radio" name="industry" value="{{ industry.id }}"><span class="starter-industry-body"><img src="{{ industry.image }}" alt="" loading="lazy"><span class="starter-industry-title">{{ industry.title }}</span><span class="starter-industry-check" aria-hidden="true">✓</span></span></label>
+      {% endfor %}
+     </div></fieldset>
+     <button type="button" class="starter-next" id="starter-next">Next: choose your challenges <span aria-hidden="true">→</span></button>
+    </div>
+    <div class="starter-panel" id="starter-problems-panel" hidden>
+     <div class="starter-panel-head"><div><span class="starter-step">02 / YOUR CHALLENGES</span><h3>What's slowing you down?</h3><p>Choose up to three problems you'd like to solve.</p></div><span class="starter-count" id="problem-count">0 of 3 selected</span></div>
+     <fieldset class="starter-fieldset"><legend class="visually-hidden">Choose up to three business problems</legend><div class="starter-problem-grid">
+      {% for challenge in content.challenges %}
+      <label class="starter-problem-choice"><input type="checkbox" name="challenge" value="{{ challenge.id }}"><span class="starter-problem-body"><span class="starter-problem-icon" aria-hidden="true">{{ challenge.icon }}</span><span class="starter-problem-text"><strong>{{ challenge.title }}</strong><small>{{ challenge.description }}</small></span><span class="starter-problem-check" aria-hidden="true">✓</span></span></label>
+      {% endfor %}
+     </div></fieldset>
+     <p class="starter-limit" id="starter-limit" role="status" aria-live="polite">Pick the challenges that matter most to you.</p>
+    </div>
+    <div class="starter-summary"><div class="starter-summary-top"><strong>Your growth plan starts here</strong><span id="starter-ready" class="starter-ready">Make your selections</span></div><div class="starter-chips" id="starter-chips" aria-live="polite"><span class="starter-placeholder">1 industry + up to 3 challenges</span></div><div class="starter-actions"><p id="starter-feedback" role="status" aria-live="polite">Choose an industry and at least one problem to continue.</p><button type="submit" class="button primary" id="starter-submit" disabled>Generate my growth plan <span aria-hidden="true">→</span></button></div></div>
+   </div>
   </form>
  </div>
 </section>
@@ -143,7 +154,7 @@
   </div>
  </div>
 </section>
-<section class="final-cta"><div class="container final-inner"><span class="eyebrow">READY TO PLANT YOUR FIRST SEED?</span><h2>Ready to grow<br><em>something great?</em></h2><p>Find your next step, one seed at a time.</p><a href="#challenges" class="button white-button">Help my business bloom <span aria-hidden="true">↗</span></a><img class="final-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"></div></section>
+<section class="final-cta"><div class="container final-inner"><span class="eyebrow">READY TO PLANT YOUR FIRST SEED?</span><h2>Ready to grow<br><em>something great?</em></h2><p>Find your next step, one seed at a time.</p><a href="#industries" class="button white-button">Help my business bloom <span aria-hidden="true">↗</span></a><img class="final-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true"></div></section>
 </main>
 <footer class="footer"><div class="container footer-grid"><div><a class="brand" href="/"><img class="brand-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true">BloomBots<span class="brand-period">.</span></a><p>Small businesses. Big possibilities. Helping ideas bloom with approachable technology.</p></div><nav aria-label="Footer links"><a href="#solutions">Solutions</a><a href="/dashboard">Decision dashboard</a><a href="/consult">Personalized consultation</a><a href="#research">Research</a><a href="#about">About us</a></nav></div><div class="container footer-bottom"><span>© {{ year }} BloomBots · Hackathon prototype</span><span>Research informs recommendations. Always confirm current vendor details.</span></div></footer>
 </body></html>
