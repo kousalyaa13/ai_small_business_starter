@@ -144,6 +144,21 @@ def stack_steps(problem):
 
 @app.get("/")
 def index():
+    return render_template("landing.html", content=landing_content(), year=date.today().year)
+
+
+def landing_content():
+    """Editable, curated marketing copy; never imply unreviewed tools or testimonials are verified."""
+    return json.loads((BASE / "data" / "landing.json").read_text(encoding="utf-8"))
+
+
+@app.get("/solutions")
+def solutions():
+    return render_template("solutions.html", content=landing_content(), year=date.today().year)
+
+
+@app.get("/dashboard")
+def dashboard():
     return render_template("dashboard.html")
 
 

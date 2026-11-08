@@ -9,10 +9,31 @@ class AppTests(unittest.TestCase):
     def test_home(self):
         r = self.client.get('/')
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b'BloomBot', r.data)
+        self.assertIn(b'northstar', r.data)
+        self.assertIn(b'id="challenge-form"', r.data)
+        self.assertIn(b'What's getting in the way', r.data)
+        self.assertIn(b'/consult?challenge=', r.data)
+        self.assertNotIn(b'fake testimonial', r.data.lower())
+
+    def test_dashboard_route(self):
+        r = self.client.get('/dashboard')
+        self.assertEqual(r.status_code, 200)
         self.assertIn(b'id="dashboard"', r.data)
         self.assertIn(b'Calculate your potential value', r.data)
         self.assertNotIn(b'Business health check</button>', r.data)
+
+    def test_solutions(self):
+        r = self.client.get('/solutions')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'Cost &amp; value planning', r.data)
+        self.assertIn(b'What does', r.data)
+        self.assertIn(b'id="verification"', r.data)
+
+    def test_consult_landing_context(self):
+        r = self.client.get('/consult?challenge=finance&industry=restaurant')
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'suggestedProblems', r.data)
+        self.assertIn(b'landingContext', r.data)
 
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})
@@ -23,7 +44,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(data['tools'][0]['name'],'Square Marketing')
 
     def test_page_is_simplified(self):
-        r = self.client.get('/')
+        r = self.client.get('/dashboard')
         self.assertNotIn(b'class="score"', r.data)
         self.assertNotIn(b'name="consent"><option value="unsure"', r.data)
         self.assertIn(b'Add details (optional)', r.data)

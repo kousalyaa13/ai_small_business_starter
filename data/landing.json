@@ -1,0 +1,180 @@
+{
+  "stats": [
+    {
+      "value": "33%",
+      "title": "Worried about AI tool quality",
+      "description": "Among small businesses not using AI, one in three cited concerns about the quality of available tools.",
+      "source_name": "U.S. Chamber · 2025 report, p. 21",
+      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
+      "year": "2025"
+    },
+    {
+      "value": "30%",
+      "title": "Concerned about implementation costs",
+      "description": "Among small businesses not using AI, nearly one in three cited the expense of getting started.",
+      "source_name": "U.S. Chamber · 2025 report, p. 21",
+      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
+      "year": "2025"
+    },
+    {
+      "value": "28%",
+      "title": "Concerned about legal and compliance issues",
+      "description": "Among small businesses not using AI, more than one in four reported uncertainty about legal or regulatory risks.",
+      "source_name": "U.S. Chamber · 2025 report, p. 21",
+      "source_url": "https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf",
+      "year": "2025"
+    }
+  ],
+  "challenges": [
+    {
+      "id": "admin",
+      "icon": "↻",
+      "title": "Too much manual work",
+      "description": "Paperwork and repetitive tasks take up my day."
+    },
+    {
+      "id": "finance",
+      "icon": "$",
+      "title": "Managing costs",
+      "description": "I need more control over budgets and expenses."
+    },
+    {
+      "id": "marketing",
+      "icon": "↗",
+      "title": "Finding customers",
+      "description": "I want to reach more people and grow sales."
+    },
+    {
+      "id": "support",
+      "icon": "✉",
+      "title": "Customer questions",
+      "description": "Keeping up with messages feels overwhelming."
+    },
+    {
+      "id": "scheduling",
+      "icon": "◷",
+      "title": "Scheduling & bookings",
+      "description": "Appointments and handoffs keep getting missed."
+    },
+    {
+      "id": "retention",
+      "icon": "♡",
+      "title": "Keeping customers",
+      "description": "I want loyal customers to come back."
+    }
+  ],
+  "industries": [
+    {
+      "id": "restaurant",
+      "title": "Cafés & restaurants",
+      "description": "Bookings, loyalty, busy shifts and daily operations.",
+      "image": "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=80",
+      "alt": "Sunlit café counter and seating"
+    },
+    {
+      "id": "retail",
+      "title": "Retail & boutiques",
+      "description": "Inventory, customer follow-up and online growth.",
+      "image": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=80",
+      "alt": "Independent clothing shop interior"
+    },
+    {
+      "id": "services",
+      "title": "Professional services",
+      "description": "Client intake, admin work and follow-through.",
+      "image": "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80",
+      "alt": "Small professional office workspace"
+    },
+    {
+      "id": "hvac",
+      "title": "Home services",
+      "description": "Job scheduling, customer requests and invoicing.",
+      "image": "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=900&q=80",
+      "alt": "Local construction and home service workers"
+    },
+    {
+      "id": "landscaping",
+      "title": "Landscaping & field teams",
+      "description": "Coordinating jobs, crews and recurring clients.",
+      "image": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=900&q=80",
+      "alt": "Green plants in outdoor garden"
+    },
+    {
+      "id": "other",
+      "title": "Your kind of business",
+      "description": "Start with the challenge that makes your day harder.",
+      "image": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80",
+      "alt": "Small team talking at a table"
+    }
+  ],
+  "services": [
+    {
+      "id": "readiness",
+      "icon": "◎",
+      "title": "Readiness check",
+      "description": "Find out what to prepare before trying a new tool."
+    },
+    {
+      "id": "discovery",
+      "icon": "⌕",
+      "title": "Tool discovery",
+      "description": "Explore practical options for the job at hand."
+    },
+    {
+      "id": "comparison",
+      "icon": "⇄",
+      "title": "Compare options",
+      "description": "Review pricing, caveats and available evidence."
+    },
+    {
+      "id": "costs",
+      "icon": "$",
+      "title": "Cost & value planning",
+      "description": "Test costs and time-saving assumptions before buying."
+    },
+    {
+      "id": "passport",
+      "icon": "▤",
+      "title": "Decision passport",
+      "description": "Save a record of the reasoning behind your choice."
+    },
+    {
+      "id": "roadmap",
+      "icon": "↗",
+      "title": "Action roadmap",
+      "description": "Turn your decision into manageable next steps."
+    }
+  ],
+  "videos": [
+    {
+      "speaker": "Ruchi Shah · TED@UPS",
+      "title": "How small business can benefit from village banking",
+      "description": "An entrepreneurial perspective on funding and community-based financial support.",
+      "url": "https://www.ted.com/talks/ruchi_shah_how_small_business_can_benefit_from_village_banking",
+      "image": "https://images.unsplash.com/photo-1556740738-b6a63e27c4df?auto=format&fit=crop&w=900&q=80",
+      "alt": "Small business owner assisting a customer",
+      "challenge": "finance",
+      "cta": "Explore business finances"
+    },
+    {
+      "speaker": "Anthony Tan & Amane Dannouni · TED@BCG",
+      "title": "Want to succeed in business? Find a problem to solve",
+      "description": "Why meaningful problems are a better starting point than chasing the next trend.",
+      "url": "https://www.ted.com/talks/anthony_tan_and_amane_dannouni_want_to_succeed_in_business_find_a_problem_to_solve",
+      "image": "https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80",
+      "alt": "Business team collaborating around a table",
+      "challenge": "admin",
+      "cta": "Explore better workflows"
+    },
+    {
+      "speaker": "Grant Sobczak · TEDx",
+      "title": "Small Business Big Results",
+      "description": "A look at the impact small businesses create in their communities.",
+      "url": "https://www.ted.com/talks/grant_sobczak_small_business_big_results",
+      "image": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80",
+      "alt": "Collaborative small business workspace",
+      "challenge": "marketing",
+      "cta": "Explore business growth"
+    }
+  ]
+}

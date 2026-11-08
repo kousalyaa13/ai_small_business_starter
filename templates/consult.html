@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BloomBot AI — Describe a problem, get a tool plan</title>
+<title>Northstar — Your personalized solution</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-recovery.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-results.css') }}">
 <style>
@@ -35,8 +35,8 @@ details{font-size:12px;color:#4d5b70}details summary{cursor:pointer;font-weight:
 </head>
 <body>
 <header class="top">
- <a class="logo" href="/"><span class="logo-mark">✳</span> BloomBot<span>AI</span></a>
- <a class="btn light" href="/">Back to dashboard</a>
+ <a class="logo" href="/"><span class="logo-mark">✳</span> Northstar<span>AI</span></a>
+ <a class="btn light" href="/">Back to Northstar</a>
 </header>
 <main class="shell">
  <section id="intake">
@@ -126,6 +126,14 @@ const safeUrl=v=>{try{const u=new URL(v);return u.protocol==='https:'?u.href:'#'
 const money=n=>n==null?'unknown':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);
 const STEPS=[['understanding','Understanding'],['clarifying','Questions'],['checking_catalog','Checking our catalog'],['researching','Researching the web'],['building_options','Building options'],['awaiting_approval','Your approval'],['approved','Approved']];
 const NO_OPTION='no_complete_option';
+// Public landing-page choices prefill context without starting or submitting a project.
+const landingContext=new URLSearchParams(window.location.search);
+const suggestedProblems={admin:'We spend too much time on repetitive paperwork and manual tasks. Help us identify a practical workflow to simplify.',finance:'We need to manage our operating expenses, track budgets, and compare software costs before investing.',marketing:'We want to reach more potential customers and grow sales without wasting money on the wrong software.',support:'We are struggling to keep up with customer questions and follow-up requests.',scheduling:'Our appointment scheduling and booking processes create missed handoffs and extra admin work.',retention:'We want to encourage repeat customers and keep better track of customer relationships.'};
+const challenge=landingContext.get('challenge');
+if(challenge&&Object.hasOwn(suggestedProblems,challenge))document.querySelector('#intake-form [name="problem_text"]').value=suggestedProblems[challenge];
+const industry=landingContext.get('industry');
+const industryNames={restaurant:'restaurant or café',retail:'retail shop',services:'professional services business',hvac:'home services business',landscaping:'landscaping business',other:'small business'};
+if(industry&&Object.hasOwn(industryNames,industry))document.querySelector('#intake-form [name="business_type"]').value=industryNames[industry];
 let projectId=new URLSearchParams(location.search).get('project'),timer=null,data=null,approveKey=null;
 
 function num(v){return v===''||v==null?null:Number(v)}
