@@ -194,3 +194,13 @@
 .comparison-filters { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:18px 0 14px; }
 .comparison-filters .choice-chip { padding:9px 15px; }
 .comparison-filters .choice-chip.selected { background:#f0eafa; border-color:#7543cc; color:#58319b; font-weight:700; }
+
+/* Live budget stays beside the recommendations heading, rather than after every tool. */
+.results-toolbar:has(.selection-summary-top){align-items:flex-start}
+.selection-summary-top{margin-left:auto;width:min(100%,390px);flex:0 1 390px;position:sticky;top:12px;z-index:5}
+.selection-summary-top .selection-bar{margin-top:0;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:13px 16px;box-shadow:0 5px 18px rgba(45,30,70,.06)}
+.selection-summary-top .selection-bar strong{font-size:21px}
+.selection-summary-top .selection-bar p{font-size:12px;line-height:1.45;max-width:none}
+.selection-summary-top .selection-actions{justify-items:stretch}
+.selection-summary-top #save-selection{width:100%}
+@media(max-width:800px){.selection-summary-top{position:static;flex:1 1 100%;width:100%}}
