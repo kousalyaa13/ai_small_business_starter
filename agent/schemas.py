@@ -183,6 +183,14 @@ class Answers(BaseModel):
     answers: dict[str, str] = Field(max_length=10)
 
 
+class RevisionRequest(BaseModel):
+    """Adjust assumptions without losing the original consultation or its plan history."""
+    monthly_budget: float | None = Field(None, ge=0, le=100_000)
+    seats: int | None = Field(None, ge=1, le=500)
+    editors: int | None = Field(None, ge=1, le=500)
+    problem_text: str | None = Field(None, min_length=10, max_length=2000)
+
+
 class ApprovalRequest(BaseModel):
     plan_version: int = Field(ge=1)
     option_id: str = Field(min_length=1, max_length=40)
