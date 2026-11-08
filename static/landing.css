@@ -277,3 +277,21 @@ html,body{max-width:100%}
 
 /* Hand-drawn growth artwork: gentle float, lively hover bounce */
 .growth-illustration{display:block;width:100%;height:100%;object-fit:contain;padding:5px;animation:growth-float 3.2s ease-in-out infinite;filter:drop-shadow(0 7px 6px #59406018)}.growth-stage:nth-child(2) .growth-illustration{animation-delay:.45s}.growth-stage:nth-child(3) .growth-illustration{animation-delay:.9s}.growth-stage:hover .growth-illustration,.growth-stage:focus-visible .growth-illustration{animation:growth-bounce .6s ease-in-out infinite alternate}@media(prefers-reduced-motion:reduce){.growth-illustration,.growth-stage:hover .growth-illustration,.growth-stage:focus-visible .growth-illustration{animation:none}}
+
+/* Dashboard capabilities live on the landing page, not a separate Solutions page */
+.toolkit-inline{grid-template-columns:minmax(220px,290px) minmax(0,1fr);align-items:start;gap:32px}
+.toolkit-intro{min-width:0}
+.toolkit-intro>p{color:#665a77;font-size:14px;line-height:1.65;margin:12px 0 18px}
+.toolkit-intro .toolkit-cta{display:inline-flex;width:auto;max-width:100%;text-align:center;padding:13px 17px;font-size:13px}
+.toolkit-links{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.toolkit-links a.toolkit-card{min-height:128px;padding:18px;display:flex;align-items:flex-start;gap:11px;background:#fff;border:1px solid #e5d9f0;border-radius:15px;text-decoration:none}
+.toolkit-card-icon{font-size:23px!important;line-height:1.2;flex:none;color:#8b53b3}
+.toolkit-card-copy{display:flex;flex:1;flex-direction:column;gap:8px;min-width:0}
+.toolkit-card-copy strong{font-size:14px;color:#4e3969;line-height:1.3}
+.toolkit-card-copy small{font-size:12px;color:#736681;font-weight:500;line-height:1.55}
+.toolkit-card-arrow{margin-left:auto;flex:none;font-size:16px;color:#8b53b3}
+.toolkit-links a.toolkit-card:hover{transform:translateY(-3px);border-color:#a982ce;box-shadow:0 9px 25px #8a65a219}
+.toolkit-links a.toolkit-card:focus-visible{outline:3px solid #8752b4;outline-offset:3px}
+@media(max-width:1050px){.toolkit-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.toolkit-inline{grid-template-columns:1fr}.toolkit-intro>p{max-width:620px}}
+@media(max-width:520px){.toolkit-links{grid-template-columns:1fr}.toolkit-links a.toolkit-card{min-height:90px}}

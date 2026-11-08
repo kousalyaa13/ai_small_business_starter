@@ -24,7 +24,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(page.count('class="section reveal '), 5)
         self.assertIn('href="/consult?industry=', page)
-        self.assertIn('href="/solutions#', page)
+        self.assertIn('href="#solutions"', page)
         self.assertIn('source_url', project.landing_content()['stats'][0])
         self.assertIn('Independent research and perspectives, not endorsements of BloomBots.', page)
 
@@ -73,6 +73,17 @@ class AppTests(unittest.TestCase):
         self.assertEqual(research.count('<iframe '), 2)
         self.assertEqual(page.count('class="section reveal '), 5)
 
+    def test_dashboard_capabilities_are_on_homepage(self):
+        page = self.client.get('/').get_data(as_text=True)
+        self.assertIn('These six capabilities are available through the BloomBots AI dashboard', page)
+        self.assertIn('href="/dashboard"', page)
+        self.assertIn('href="/consult"', page)
+        self.assertNotIn('href="/solutions"', page)
+        for service in project.landing_content()['services']:
+            with self.subTest(service=service['id']):
+                self.assertIn(service['title'], page)
+                self.assertIn(service['description'], page)
+
     def test_dashboard_route(self):
         r = self.client.get('/dashboard')
         self.assertEqual(r.status_code, 200)
@@ -82,10 +93,8 @@ class AppTests(unittest.TestCase):
 
     def test_solutions(self):
         r = self.client.get('/solutions')
-        self.assertEqual(r.status_code, 200)
-        self.assertIn(b'Cost &amp; value planning', r.data)
-        self.assertIn(b'What does', r.data)
-        self.assertIn(b'id="verification"', r.data)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers['Location'], '/#solutions')
 
     def test_consult_landing_context(self):
         r = self.client.get('/consult?challenge=finance&industry=restaurant')
@@ -128,10 +137,8 @@ class AppTests(unittest.TestCase):
 
     def test_bloombots_solutions_brand(self):
         response = self.client.get('/solutions')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'BloomBots', response.data)
-        self.assertIn(b'sproutbot.svg', response.data)
-        self.assertIn(b'id="verification"', response.data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/#solutions')
 
     def test_recommendations(self):
         r = self.client.post('/api/recommend', json={'industry':'coffee','problem':'retention', 'software':'Square','budget':'75','comfort':'beginner'})
