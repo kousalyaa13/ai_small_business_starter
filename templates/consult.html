@@ -73,8 +73,6 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
     <label class="field">Monthly budget for new software ($)<input name="monthly_budget" type="number" min="0" step="1" placeholder="e.g. 30"></label>
     <label class="field">Total people who need access<input name="seats" type="number" min="1" max="500" placeholder="e.g. 5 (or describe above)"></label>
      <label class="field">How many need editing access?<input name="editors" type="number" min="1" max="500" placeholder="Optional; we can ask later"></label>
-    <label class="field">New leads or records per month<input name="monthly_volume" type="number" min="0" placeholder="Optional"></label>
-    <label class="field">Total contacts you keep<input name="contacts" type="number" min="0" placeholder="Optional"></label>
    </div>
    <div class="submit-line"><span class="caption">Nothing is purchased or connected. You approve a plan first.</span><button class="btn blue" id="start-btn" type="submit">Find tools →</button></div>
    <div id="intake-error" class="err" role="alert" hidden></div>
@@ -181,7 +179,7 @@ $('intake-form').addEventListener('submit',async e=>{
  const body={problem_text:f.get('problem_text'),business_name:f.get('business_name'),business_type:f.get('business_type'),
   existing_software:String(f.get('existing_software')||'').split(',').map(s=>s.trim()).filter(Boolean),
   monthly_budget:num(f.get('monthly_budget')),
-  usage:{monthly_volume:num(f.get('monthly_volume')),contacts:num(f.get('contacts'))}};
+  usage:{}};
  if(num(f.get('seats'))!==null)body.usage.seats=num(f.get('seats'));
  if(num(f.get('editors'))!==null)body.usage.editors=num(f.get('editors'));
  try{const r=await fetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
