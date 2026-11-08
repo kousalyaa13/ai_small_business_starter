@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Find practical, evidence-informed technology solutions for your small business. Compare options, estimate costs, and plan your next step with Northstar.">
-<title>Northstar — Better decisions for your business</title>
+<meta name="description" content="Find practical, evidence-informed technology solutions for your small business. Compare options, estimate costs, and plan your next step with BloomBot AI.">
+<title>BloomBot AI — Better decisions for your business</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
 <script defer src="{{ url_for('static', filename='landing.js') }}"></script>
 </head>
@@ -11,7 +11,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-header">
  <div class="container nav-inner">
-  <a class="brand" href="/" aria-label="Northstar home"><span class="brand-icon" aria-hidden="true">✳</span>northstar<span class="brand-period">.</span></a>
+    <a class="brand" href="/" aria-label="BloomBot AI home"><span class="brand-icon" aria-hidden="true">✳</span>BloomBot<span class="brand-period"> AI.</span></a>
   <button class="menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-controls="primary-nav" aria-expanded="false">☰</button>
   <nav id="primary-nav" class="nav-links" aria-label="Main navigation">
    <a href="/solutions">Solutions</a><a href="#industries">Industries</a><a href="#research">Research</a><a href="#stories">Stories</a><a href="#approach">Our approach</a>
@@ -74,25 +74,25 @@
 </section>
 <section class="section solution-section" id="approach">
  <div class="container solution-grid">
-  <div class="solution-copy"><span class="eyebrow">THE NORTHSTAR DIFFERENCE</span><h2>Less guessing.<br><em>More doing.</em></h2><p>You don't need another overwhelming list of apps. You need a clear answer to one question: <strong>what makes sense for my business?</strong></p>
+    <div class="solution-copy"><span class="eyebrow">THE BLOOMBOT AI DIFFERENCE</span><h2>Less guessing.<br><em>More doing.</em></h2><p>You don't need another overwhelming list of apps. You need a clear answer to one question: <strong>what makes sense for my business?</strong></p>
    <div class="process-list"><div><span>01</span><section><h3>Tell us what's happening</h3><p>Start with a challenge in your own words. Share your budget and current software when you're ready.</p></section></div><div><span>02</span><section><h3>Explore evidence-informed options</h3><p>Compare candidate tools, price assumptions, integration considerations, and important unknowns.</p></section></div><div><span>03</span><section><h3>Leave with a practical plan</h3><p>Understand tradeoffs, try an example, and map the next steps before committing.</p></section></div></div>
    <a href="/solutions" class="button light-button">Explore all solutions <span aria-hidden="true">↗</span></a>
   </div>
-  <div class="product-demo" aria-label="Example of the Northstar business decision experience">
-   <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ northstar.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>One clear path forward.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div><div class="demo-note">Illustrative example · Not a verified customer outcome</div></div></div>
+    <div class="product-demo" aria-label="Example of the BloomBot AI business decision experience">
+     <div class="demo-shell"><div class="demo-bar"><span class="demo-logo">✳ BloomBot AI.</span><span class="demo-dots">● ● ●</span></div><div class="demo-content"><small>YOUR PERSONALIZED DECISION WORKSPACE</small><h3>One clear path forward.</h3><div class="demo-pill">✧ Your business challenge</div><div class="demo-challenge">“We spend hours moving information between tools.”</div><div class="demo-recommend"><span class="rec-icon">↗</span><div><small>STARTING POINT</small><strong>Map one repetitive workflow</strong><p>Identify the handoffs and compare options before changing your process.</p></div></div><div class="demo-steps"><span>01 <b>Understand</b> ✓</span><span>02 <b>Compare</b> ✓</span><span>03 <b>Plan</b> →</span></div><div class="demo-note">Illustrative example · Not a verified customer outcome</div></div></div>
    <div class="demo-corner">A clearer decision starts here. <span>✳</span></div>
   </div>
  </div>
 </section>
 <section class="section capabilities-section" id="solutions">
- <div class="container"><div class="section-heading-row"><div><span class="eyebrow dark">WHAT YOU CAN DO WITH NORTHSTAR</span><h2>Everything you need<br>to make a <em>confident move.</em></h2></div><p>From the first question to the final decision, explore the tools that help you move forward on your terms.</p></div>
+ <div class="container"><div class="section-heading-row"><div><span class="eyebrow dark">WHAT YOU CAN DO WITH BLOOMBOT AI</span><h2>Everything you need<br>to make a <em>confident move.</em></h2></div><p>From the first question to the final decision, explore the tools that help you move forward on your terms.</p></div>
   <div class="capability-grid">{% for service in content.services %}<a class="capability-card" href="/solutions#{{ service.id }}"><span class="capability-icon" aria-hidden="true">{{ service.icon }}</span><h3>{{ service.title }}</h3><p>{{ service.description }}</p><span class="card-link">Explore capability ↗</span></a>{% endfor %}</div>
  </div>
 </section>
 <section class="section story-section" id="stories">
  <div class="container"><div class="section-heading-row"><div><span class="eyebrow">THE PEOPLE BEHIND THE PROBLEMS</span><h2>Real stories.<br><em>Better conversations.</em></h2></div><p>Hear from entrepreneurs, researchers, and business leaders. Their experiences help us ask better questions—not pretend every business has the same answer.</p></div>
   <div class="story-grid">{% for video in content.videos %}<article class="story-card"><div class="story-thumb"><img src="{{ video.image }}" alt="{{ video.alt }}" loading="lazy"><span class="story-type">TED TALK</span></div><div class="story-body"><span class="story-author">{{ video.speaker }}</span><h3>{{ video.title }}</h3><p>{{ video.description }}</p><a href="{{ video.url }}" target="_blank" rel="noopener noreferrer">Watch the conversation ↗</a><div class="story-related">EXPLORE THIS CHALLENGE <a href="/consult?challenge={{ video.challenge }}">{{ video.cta }} →</a></div></div></article>{% endfor %}</div>
-  <p class="story-disclaimer">Independent talks shared for educational context. Speakers and organizations are not affiliated with or endorsing Northstar.</p>
+    <p class="story-disclaimer">Independent talks shared for educational context. Speakers and organizations are not affiliated with or endorsing BloomBot AI.</p>
  </div>
 </section>
 <section class="section trust-section" id="trust">
@@ -102,5 +102,5 @@
 </section>
 <section class="final-cta"><div class="container final-inner"><span class="eyebrow">YOUR NEXT CHAPTER STARTS HERE</span><h2>Your business has potential.<br><em>Let's make room for it.</em></h2><p>No complicated setup. No pressure to buy. Just a clearer path toward your next decision.</p><a href="#challenges" class="button white-button">Find my starting point <span aria-hidden="true">↗</span></a><span class="final-decoration" aria-hidden="true">✳</span></div></section>
 </main>
-<footer class="footer"><div class="container footer-grid"><div><a class="brand" href="/"><span class="brand-icon">✳</span>northstar<span class="brand-period">.</span></a><p>Practical technology decisions for the people building small businesses.</p></div><nav aria-label="Footer links"><a href="/solutions">Solutions</a><a href="/dashboard">Decision dashboard</a><a href="/consult">Personalized consultation</a><a href="#research">Research</a></nav></div><div class="container footer-bottom"><span>© {{ year }} Northstar · Hackathon prototype</span><span>Research informs recommendations. Always confirm current vendor details.</span></div></footer>
+<footer class="footer"><div class="container footer-grid"><div><a class="brand" href="/"><span class="brand-icon">✳</span>BloomBot<span class="brand-period"> AI.</span></a><p>Practical technology decisions for the people building small businesses.</p></div><nav aria-label="Footer links"><a href="/solutions">Solutions</a><a href="/dashboard">Decision dashboard</a><a href="/consult">Personalized consultation</a><a href="#research">Research</a></nav></div><div class="container footer-bottom"><span>© {{ year }} BloomBot AI · Hackathon prototype</span><span>Research informs recommendations. Always confirm current vendor details.</span></div></footer>
 </body></html>

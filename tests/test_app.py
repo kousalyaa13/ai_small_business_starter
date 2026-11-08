@@ -9,9 +9,9 @@ class AppTests(unittest.TestCase):
     def test_home(self):
         r = self.client.get('/')
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b'northstar', r.data)
+        self.assertIn(b'BloomBot', r.data)
         self.assertIn(b'id="challenge-form"', r.data)
-        self.assertIn(b'What's getting in the way', r.data)
+        self.assertIn(b"What's getting in the way", r.data)
         self.assertIn(b'/consult?challenge=', r.data)
         self.assertNotIn(b'fake testimonial', r.data.lower())
 

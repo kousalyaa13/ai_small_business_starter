@@ -1,12 +1,12 @@
-# Northstar landing website
+# BloomBot AI landing website
 
-The public homepage (`/`) introduces Northstar to small-business owners. The existing simple decision dashboard is available at `/dashboard`, and the detailed consultation agent remains at `/consult`. A separate `/solutions` page explains product capabilities and limits of source verification.
+The public homepage (`/`) introduces BloomBot AI to small-business owners. The existing simple decision dashboard is available at `/dashboard`, and the detailed consultation agent remains at `/consult`. A separate `/solutions` page explains product capabilities and limits of source verification.
 
 ## Update content without editing layouts
 
 All public statistics, challenge cards, industry examples, capability descriptions and independent video links live in **`data/landing.json`**. Edit the relevant array and restart/redeploy the Flask app. Keep statistics attributed to specific reports, clearly state the survey population, and update the year and original source URL whenever a figure changes.
 
-The stories section links to independently published TED talks. **It does not claim these speakers endorse Northstar.** Don't add invented business testimonials. If real owners later provide pilot feedback and consent to publication, add a separately labeled testimonial section with their approved wording.
+The stories section links to independently published TED talks. **It does not claim these speakers endorse BloomBot AI.** Don't add invented business testimonials. If real owners later provide pilot feedback and consent to publication, add a separately labeled testimonial section with their approved wording.
 
 ### Core routes
 
@@ -28,7 +28,7 @@ Photos use Unsplash URLs and require network access. Google Fonts fall back to s
 
 ### Research and verification policy
 
-Survey statistics in the initial page are from page 21 of the [2025 U.S. Chamber Empowering Small Business report](https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf), specifically respondents **not currently using AI**. The original prototype catalog itself explicitly requires verification. Northstar's estimate of tool fit, projected value, and compatibility must not be represented as independently validated outcomes.
+Survey statistics in the initial page are from page 21 of the [2025 U.S. Chamber Empowering Small Business report](https://www.uschamber.com/assets/documents/Empowering-Small-Business-Report-2025.pdf), specifically respondents **not currently using AI**. The original prototype catalog itself explicitly requires verification. BloomBot AI's estimate of tool fit, projected value, and compatibility must not be represented as independently validated outcomes.
 
 ### Smoke tests
 
