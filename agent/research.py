@@ -546,7 +546,7 @@ class Researcher:
                               evidence=evidence, notes=notes, audience=extracted.audience[:80],
                               setup_complexity=extracted.setup_complexity, best_for=lead.best_for,
                               mentions=lead.mentions, fit=extracted.fit, fit_reason=extracted.fit_reason[:200])
-        self.store.save_discovered(candidate, component.description)
+        self.store.save_discovered(candidate, component.description, component.capability)
         self.store.save_fit(fit_key(candidate.tool_id, component.description, intake.business_type),
                             candidate.fit, candidate.fit_reason)
         return candidate, None

@@ -108,9 +108,9 @@ class WorkflowTests(unittest.TestCase):
                    "Budget of 75 per month. 5 people need access.")
         project_id, _ = svc.start(Intake(problem_text=request))
         first = svc.status(project_id)
-        self.assertEqual(first["run"]["status"], "waiting_input")
-        self.assertEqual(first["questions"][0]["field"], "editors")
-        svc.answer(project_id, Answers(answers={"q_editors": "3"}))
+        # Editor counts only change price, so they aren't asked up front; owners adjust them afterwards.
+        self.assertEqual((first["run"]["status"], first["questions"]), ("waiting_approval", []))
+        svc.revise(project_id, RevisionRequest(editors=3))
         first_plan = svc.status(project_id)
         self.assertEqual(first_plan["run"]["status"], "waiting_approval")
         self.assertEqual(first_plan["recovery"]["editors"], 3)
@@ -256,6 +256,24 @@ class FitDrivenResearchTests(unittest.TestCase):
         self.assertIn("TableBook", tools)
         self.assertEqual(tools["TableBook"]["fit"], "built_for_this")
         self.assertEqual(booking["tools"][0]["name"], "TableBook")  # purpose first in the list
+
+
+class PlainNoteTests(unittest.TestCase):
+    def test_plain_notes_replace_working_notes(self):
+        from agent.service import plain_note
+        tools = [{"fit": "built_for_this"}, {"fit": "built_for_this"}, {"fit": "workable"}]
+        self.assertEqual(plain_note(tools, True, "Restaurant"),
+                         "We searched the web for tools made for this and found 3 tools, including 2 made for restaurant businesses.")
+        self.assertEqual(plain_note([{"fit": "workable"}], False, "restaurant"),
+                         "We found 1 tool for this, but none made specifically for it, so check each one's fit.")
+        self.assertIn("couldn't find a tool", plain_note([], True, ""))
+
+    def test_status_carries_a_plain_note_per_need(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = make_service(tmp)
+            pid, _ = svc.start(Intake(problem_text=EXAMPLE, monthly_budget=30, business_type="plumbing"))
+            for comp in svc.status(pid)["components"]:
+                self.assertTrue(comp["plain_note"].startswith("We "))
 
 
 class BuiltForThisModel(StubModel):
@@ -434,9 +452,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(r.status_code, 202)
         pid = r.get_json()["project_id"]
         initial = self.client.get(f"/api/projects/{pid}").get_json()
-        self.assertEqual(initial["questions"][0]["field"], "editors")
-        self.assertEqual(self.client.post(f"/api/projects/{pid}/answers",
-                                          json={"answers": {"q_editors": "3"}}).status_code, 202)
+        self.assertEqual(initial["questions"], [])  # no editor question up front
         changed = self.client.post(f"/api/projects/{pid}/revise",
                                    json={"editors": 5, "monthly_budget": 75})
         self.assertEqual(changed.status_code, 202)

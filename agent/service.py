@@ -20,6 +20,20 @@ AUTHORIZED_ACTIONS = ["record_selected_plan"]  # build/deploy actions arrive in 
 DEFAULT = object()  # sentinel: choose the client from environment configuration
 
 
+def plain_note(tools, researched, business_type):
+    """One sentence an owner can read, instead of the research step's working notes."""
+    built = sum(1 for t in tools if t.get("fit") == "built_for_this")
+    kind = f"{business_type.strip().lower()} businesses" if business_type else "this kind of job"
+    if not tools:
+        return ("We searched the web but couldn't find a tool for this yet. You can skip it or mark it as already handled."
+                if researched else "We couldn't find a tool for this yet.")
+    found = f"found {len(tools)} tool{'s' if len(tools) != 1 else ''}"
+    made = (f", including {built} made for {kind}" if built and built < len(tools) else
+            f", all made for {kind}" if built else ", but none made specifically for it, so check each one's fit")
+    return (f"We searched the web for tools made for this and {found}{made}." if researched
+            else f"We {found} for this{made}.")
+
+
 class NotFound(Exception):
     pass
 
@@ -182,8 +196,10 @@ class AgentService:
             try:
                 _, comps_ctx, cands_ctx, intake_ctx = self._plan_context(project_id)
                 tools = component_tools(comps_ctx, cands_ctx, intake_ctx)
+                researched = set(self.store.get_run(plan["run_id"])["snapshot"].get("gaps", []))
                 for comp in components:
                     comp["tools"] = tools.get(comp["id"], [])
+                    comp["plain_note"] = plain_note(comp["tools"], comp["id"] in researched, intake_ctx.business_type)
             except Conflict:
                 pass
         usage = Meter(self.store, run["id"], project_id, Limits.from_env()).totals() if run else {}

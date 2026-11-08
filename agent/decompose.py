@@ -35,7 +35,7 @@ Rules:
 - For duplicates, match on email unless the owner names a different identifier.
 - Ask at most one clarifying question, and only if the answer changes which kind of tool is needed
   (e.g. where an existing form or customer list lives). Do not ask about volume, number of users or editors,
-  or budget: those are asked later, only when a shown plan's price depends on them. Do not ask about
+  or budget: they only affect price, not which tools fit, and owners can adjust them after seeing options. Do not ask about
   anything already provided.
 - summary: one sentence, 25 words or fewer.
 - Use ids c1, c2, ... and q1, q2, ...
@@ -78,18 +78,11 @@ def clean_decomposition(result: Decomposition, intake: Intake) -> tuple[list[Com
                 "editors": intake.usage.editors is not None,
                 "seats": True}
     # Before research, only questions that change the search or ranking are asked. Volume, team size
-    # and editor counts are asked after options exist, and only if a shown plan's price depends on them.
+    # and editor counts only change price, so they are never asked; owners can adjust them after seeing options.
     priced_later = {"monthly_volume", "contacts", "seats", "editors"}
     questions = [q for q in result.questions
                  if q.field not in priced_later and not answered.get(q.field, False)][:1]
 
-    budget_caps = {"budget_planning", "budget_tracking", "financial_reporting", "budget_approvals"}
-    if (intake.usage.seats > 1 and intake.usage.editors is None
-            and any(c.capability in budget_caps for c in components)
-            and not any(q.field == "editors" for q in questions)):
-        questions.insert(0, ClarifyingQuestion(
-            id="q_editors", field="editors",
-            question=f"Of the {intake.usage.seats} people, how many need to create or edit budgets? The others can have view-only access if supported."))
     # Budget is required to rank options; ask for it even if the model did not.
     if not answered["monthly_budget"] and not any(q.field == "monthly_budget" for q in questions):
         questions.insert(0, ClarifyingQuestion(id="q_budget", field="monthly_budget",

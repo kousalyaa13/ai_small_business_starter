@@ -236,7 +236,6 @@ class PlanVersion(BaseModel):
     gaps: list[str]
     research_notes: list[str]
     created_at: str
-    pricing_questions: list[dict] = Field(default_factory=list)  # asked after research, only if a price depends on them
 
 
 class Answers(BaseModel):

@@ -68,7 +68,8 @@
   // ---- Needs picker: one row per need, identical in every view. -----------------------------
   // Every tool research found for a need is listed under it; the owner picks one tool per need
   // (or "I already have this" / "Skip"). Prices are always computed by the server.
-  const openNeeds = new Set();          // rows the user expanded; restored on every redraw
+  let activeNeed = null;                 // the need whose tools are shown in the carousel
+  const trackScroll = {};                // carousel position per need, kept across redraws
   const researching = new Set();        // needs with a search in progress
   let picks = {}, picksPlan = null;     // need id -> tool id | 'have' | 'skip'
   let preview = null, previewKey = '', previewTimer = null, suggestion = null, lastDrawn = '';
@@ -130,62 +131,90 @@
     '<span class="need-tag' + (t.setup_complexity === 'developer' ? ' dev' : '') + '">' +
     ({'no-code':'No-code','low-code':'Low-code',developer:'Developer setup'})[t.setup_complexity] + '</span>' : '';
 
-  function choiceLabel(need) {
-    const native = nativeTool(need);
-    if (native) return 'Built into ' + native.name;
-    const c = picks[need.id];
-    if (c === 'have') return 'Using what you already have';
-    if (c === 'skip') return 'Skipped for now';
-    const t = toolsOf(need).find(x => x.tool_id === c);
-    if (!t) return 'Choose a tool';
-    const caveat = t.fit === 'poor' ? ' · not designed for this' : t.fit === 'workable' ? ' · works, with limits' : '';
-    return t.name + ' · ' + priceText(t) + caveat;
-  }
-
   const shorten = (text, n) => !text ? '' : text.length > n ? text.slice(0, n - 1).trimEnd() + '…' : text;
   // One line on what a tool is good for: the comparison article's note, else its own description.
-  const pitch = t => t.best_for ? 'Best for ' + t.best_for.replace(/^best for\s+/i, '').replace(/\.$/, '') : shorten(t.description, 130);
+  // What a tool is good for: the comparison article's note, else its own full description (never cut off in code).
+  const pitch = t => t.best_for ? 'Best for ' + t.best_for.replace(/^best for\s+/i, '').replace(/\.$/, '') : (t.description || '');
+  const expandedPitch = new Set();      // tools whose full description the owner opened
 
-  function needRow(need, canEdit, seen) {
+  // ---- Horizontal layout: a strip of needs, and a carousel of tool cards for the open need. -----
+  const pickedTool = need => toolsOf(need).find(t => t.tool_id === picks[need.id]);
+  function needTabs(canEdit) {
+    return '<div class="need-strip" role="tablist" aria-label="Your needs">' + needs().map((n, i) => {
+      const t = pickedTool(n), native = nativeTool(n);
+      const state = researching.has(n.id) ? 'Searching…' : native ? 'Built in' :
+        picks[n.id] === 'have' ? 'Already have' : picks[n.id] === 'skip' ? 'Skipped' : t ? t.name : 'Choose a tool';
+      // A chosen tool is just "done" here; fit details live on the tool cards, not as a warning in the strip.
+      const status = (picks[n.id] || native) ? 'done' : 'todo';
+      return '<button type="button" role="tab" class="need-tab ' + status + (n.id === activeNeed ? ' active' : '') +
+        '" data-tab="' + escape(n.id) + '" aria-selected="' + (n.id === activeNeed) + '" aria-controls="need-panel">' +
+        '<span class="need-tab-step">' + (i + 1) + '</span><span class="need-tab-text"><span class="need-tab-name">' +
+        escape(shorten(n.description.replace(/\.$/, ''), 48)) + '</span><span class="need-tab-pick">' +
+        (status === 'done' ? '✓ ' : '') + escape(state) + '</span></span></button>';
+    }).join('') + '</div>';
+  }
+
+  function toolCard(need, t, canEdit, isNew, current) {
+    const selected = picks[need.id] === t.tool_id;
+    const also = (t.also_fits || []).map(id => needById(id)?.description).filter(Boolean);
+    const site = official(t.site);
+    const cheaper = current && current.tool_id !== t.tool_id && t.monthly_cost != null &&
+      current.monthly_cost != null && t.monthly_cost < current.monthly_cost;
+    return '<article class="tool-card' + (selected ? ' selected' : '') + '" role="listitem">' +
+      '<div class="tool-card-tags">' + (isNew ? '<span class="need-tag new">New</span>' : '') +
+      (cheaper ? '<span class="need-tag cheaper">Cheaper than your pick</span>' : '') + '</div>' +
+      fitBlock(t) +
+      '<div class="tool-card-head"><b>' + escape(t.name) + '</b><span class="tool-card-price">' + escape(priceText(t)) +
+      (t.plan_name && t.monthly_cost != null ? '<small>' + escape(t.plan_name) + '</small>' : '') + '</span></div>' +
+      (pitch(t) ? '<p class="tool-card-pitch' + (expandedPitch.has(t.tool_id) ? ' open' : '') + '">' + escape(pitch(t)) + '</p>' +
+        (pitch(t).length > 120 ? '<button type="button" class="link-btn more-btn" data-more="' + escape(t.tool_id) +
+          '" aria-expanded="' + expandedPitch.has(t.tool_id) + '">' + (expandedPitch.has(t.tool_id) ? 'Less' : 'More') +
+          '</button>' : '') : '') +
+      '<div class="tool-choice-meta">' + trustTag(t) + setupTag(t) +
+      (also.length ? '<span>Also covers: ' + escape(also.join(', ')) + '</span>' : '') + '</div>' +
+      '<div class="tool-card-foot">' +
+      (site ? '<a href="' + escape(site) + '" target="_blank" rel="noopener noreferrer">Visit website ↗</a>' : '<span></span>') +
+      (canEdit ? '<button type="button" class="btn ' + (selected ? 'light' : 'blue') + ' pick-btn" data-pick="' +
+        escape(t.tool_id) + '" data-need="' + escape(need.id) + '" aria-pressed="' + selected + '">' +
+        (selected ? 'Selected ✓' : 'Select') + '</button>' : (selected ? '<span class="caption">Your pick</span>' : '')) +
+      '</div></article>';
+  }
+
+  function needPanel(need, canEdit, seen) {
     const native = nativeTool(need);
     const isNew = t => !!seen[need.id] && !seen[need.id].includes(t.tool_id);
-    const current = toolsOf(need).find(t => t.tool_id === picks[need.id]);
+    const current = pickedTool(need);
     // New finds first, so a finished search is easy to read.
     const tools = [...toolsOf(need)].sort((a, b) => isNew(b) - isNew(a));
-    const choice = (value, inner) => '<label class="tool-choice' + (picks[need.id] === value ? ' selected' : '') + '">' +
-      '<input type="radio" name="need-' + escape(need.id) + '" value="' + escape(value) + '" data-need="' +
-      escape(need.id) + '"' + (picks[need.id] === value ? ' checked' : '') + (canEdit ? '' : ' disabled') + '>' + inner + '</label>';
-    const rows = tools.map(t => {
-      const also = (t.also_fits || []).map(id => needById(id)?.description).filter(Boolean);
-      const site = official(t.site);
-      const cheaper = current && current.tool_id !== t.tool_id && t.monthly_cost != null &&
-        current.monthly_cost != null && t.monthly_cost < current.monthly_cost;
-      return choice(t.tool_id, '<span class="tool-choice-main"><b>' + escape(t.name) + '</b>' +
-        (isNew(t) ? ' <span class="need-tag new">New</span>' : '') +
-        (cheaper ? ' <span class="need-tag cheaper">Cheaper than your pick</span>' : '') +
-        '<span class="tool-choice-price">' + escape(priceText(t)) +
-        (t.plan_name && t.monthly_cost != null ? ' · ' + escape(t.plan_name) : '') + '</span></span>' +
-        fitBlock(t) + (pitch(t) ? '<span class="tool-choice-pitch">' + escape(pitch(t)) + '</span>' : '') +
-        '<span class="tool-choice-meta">' + trustTag(t) + setupTag(t) +
-        (also.length ? '<span>Also covers: ' + escape(also.join(', ')) + '</span>' : '') +
-        (site ? '<a href="' + escape(site) + '" target="_blank" rel="noopener noreferrer">Visit website ↗</a>' : '') + '</span>');
-    }).join('');
-    const body = native ? '<p class="caption">Both steps happen in ' + escape(native.name) +
-        ', so no separate connector is needed.</p>' :
-      (tools.length ? rows : '<p class="caption">No tool found for this need yet.</p>') +
-      choice('have', '<span class="tool-choice-main"><b>I already have this</b><span class="tool-choice-price">$0</span></span>') +
-      choice('skip', '<span class="tool-choice-main"><b>Skip for now</b><span class="tool-choice-price">$0</span></span>');
     const share = suggestion && suggestion.from === need.id ? '<div class="share-suggest">' + escape(suggestion.name) +
       ' also covers ' + escape(suggestion.needs.map(id => needById(id)?.description).join(', ')) + '. ' +
       '<button type="button" class="research-btn" data-share="yes">Use ' + escape(suggestion.name) + ' there too</button>' +
       '<button type="button" class="link-btn" data-share="no">No thanks</button></div>' : '';
-    return '<details class="need-pick' + (researching.has(need.id) ? ' is-searching' : '') + '" data-need-row="' +
-      escape(need.id) + '"' + (openNeeds.has(need.id) ? ' open' : '') + '>' +
-      '<summary><span class="need-name">' + escape(need.description) + '</span><span class="need-choice">' +
-      escape(researching.has(need.id) ? 'Searching…' : choiceLabel(need)) + '</span><span class="need-count">' +
-      (native ? '' : tools.length + (tools.length === 1 ? ' tool' : ' tools')) + '</span></summary>' +
-      '<div class="need-body">' + searchBanner(need, tools.filter(isNew), current) + share + body +
-      searchControl(need, canEdit, native) + '</div></details>';
+    const index = needs().findIndex(n => n.id === need.id);
+    const head = '<div class="need-panel-head"><div><div class="mini-label">NEED ' + (index + 1) + ' OF ' + needs().length +
+      '</div><h3>' + escape(need.description) + '</h3>' +
+      (need.plain_note ? '<p class="caption need-note">' + escape(need.plain_note) + '</p>' : '') + '</div>' +
+      '<div class="need-nav"><button type="button" class="nav-btn" data-step="-1" aria-label="Previous need"' +
+      (index === 0 ? ' disabled' : '') + '>‹ Previous need</button><button type="button" class="nav-btn" data-step="1" ' +
+      'aria-label="Next need"' + (index === needs().length - 1 ? ' disabled' : '') + '>Next need ›</button></div></div>';
+    if (native) {
+      return head + '<p class="caption native-note">Both steps happen in ' + escape(native.name) +
+        ', so no separate connector is needed.</p>';
+    }
+    const carousel = tools.length ?
+      '<div class="carousel"><div class="carousel-bar"><span class="caption carousel-count" id="carousel-count">' +
+      tools.length + (tools.length === 1 ? ' tool' : ' tools') + '</span>' +
+      '<span class="carousel-arrows"><button type="button" class="nav-btn" data-scroll="-1" aria-label="Previous tools">‹</button>' +
+      '<button type="button" class="nav-btn" data-scroll="1" aria-label="Next tools">›</button></span></div>' +
+      '<div class="carousel-track" id="carousel-track" role="list" tabindex="0" aria-label="Tools for this need">' +
+      tools.map(t => toolCard(need, t, canEdit, isNew(t), current)).join('') + '</div></div>' :
+      '<p class="caption">No tool found for this need yet.</p>';
+    const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
+      (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
+      (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
+    return head + searchBanner(need, tools.filter(isNew), current) + share + carousel +
+      '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
+      searchControl(need, canEdit, native) + '</div>';
   }
 
   // What happened with "Find cheaper or better options" for this need, in plain words.
@@ -209,7 +238,7 @@
     return '<div class="research-result" role="status"><b>Search finished: ' + found.length + ' new tool' +
       (found.length === 1 ? '' : 's') + ' found</b> — ' + escape(found.map(t => t.name + ' (' + priceText(t) + ')').join(', ')) +
       (cheaper.length ? '. Cheaper than your pick: ' + escape(cheaper.map(t => t.name).join(', ')) : '') +
-      '. They are listed first below. <button type="button" class="link-btn" data-dismiss-search>Dismiss</button></div>';
+      '. They are shown first in the carousel. <button type="button" class="link-btn" data-dismiss-search>Dismiss</button></div>';
   }
 
   function searchControl(need, canEdit, native) {
@@ -234,11 +263,6 @@
     else if (unpriced.length) message = [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
       ' doesn’t list a price on its website, so this selection can’t be saved yet. Pick another tool or skip that need.';
     else canSave = true;
-    const mismatched = needs().map(n => ({n, t: toolsOf(n).find(x => x.tool_id === picks[n.id])}))
-      .filter(x => x.t && ['poor','workable'].includes(x.t.fit));
-    if (canSave && mismatched.length) message = 'Before you save: ' + mismatched.map(x => x.t.name + ' is ' +
-      (x.t.fit === 'poor' ? 'not designed for ' : 'usable, with limits, for ') + '“' + x.n.description.replace(/\.$/, '') + '”')
-      .join('; ') + '. Open the row to see why and compare tools built for the job.';
     const quick = (data.plan.options || []).map(opt => '<button type="button" class="quick-pick" data-quick="' +
       escape(opt.id) + '">' + escape(opt.title) + '</button>').join('');
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
@@ -255,8 +279,33 @@
   function drawNeeds() {
     const canEdit = editable();
     const seen = readJSON(seenKey(), {});
-    byId('options').innerHTML = '<div class="needs-picker">' + needs().map(n => needRow(n, canEdit, seen)).join('') +
-      '</div><div id="selection-summary">' + summaryHtml(canEdit) + '</div>';
+    if (!needById(activeNeed)) activeNeed = (needs().find(n => !picks[n.id] && !nativeTool(n)) || needs()[0])?.id || null;
+    const need = needById(activeNeed);
+    byId('options').innerHTML = '<div class="needs-picker">' + needTabs(canEdit) +
+      '<section class="need-panel' + (researching.has(activeNeed) ? ' is-searching' : '') + '" id="need-panel" role="tabpanel">' +
+      (need ? needPanel(need, canEdit, seen) : '') + '</section></div><div id="selection-summary">' + summaryHtml(canEdit) + '</div>';
+    const track = byId('carousel-track');
+    if (track) { track.scrollLeft = trackScroll[activeNeed] || 0; updateCount(); }
+    byId('options').querySelector('.need-tab.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  }
+  // "1–3 of 7": which cards are in view.
+  function updateCount() {
+    const track = byId('carousel-track'), label = byId('carousel-count');
+    if (!track || !label) return;
+    const cards = [...track.children];
+    const box = track.getBoundingClientRect();
+    const visible = cards.map((c, i) => [i, c.getBoundingClientRect()])
+      .filter(([, r]) => r.right > box.left + 8 && r.left < box.right - 8).map(([i]) => i);
+    label.textContent = visible.length && visible.length < cards.length ?
+      (visible[0] + 1) + '–' + (visible[visible.length - 1] + 1) + ' of ' + cards.length + ' tools' :
+      cards.length + (cards.length === 1 ? ' tool' : ' tools');
+  }
+  function scrollTrack(direction) {
+    const track = byId('carousel-track');
+    if (!track) return;
+    const card = track.firstElementChild;
+    const step = card ? card.getBoundingClientRect().width + 14 : track.clientWidth * 0.8;
+    track.scrollBy({left: direction * step, behavior: 'smooth'});
   }
   function drawSummary() {
     const box = byId('selection-summary');
@@ -321,42 +370,6 @@
     }
   }
 
-  // Asked after research, only when a shown plan's price depends on the answer.
-  function renderPricingQuestions(plan, show) {
-    const box = byId('pricing-questions');
-    const qs = (plan.pricing_questions || []);
-    box.hidden = !qs.length || !show;
-    if (box.hidden) { box.innerHTML = ''; return; }
-    box.innerHTML = '<h3>Help us price this accurately</h3>' + qs.map(q =>
-      '<label class="field">' + escape(q.question) + '<input type="number" min="0" step="1" data-pq="' +
-      escape(q.field) + '" inputmode="numeric"></label>').join('') +
-      '<button type="button" class="btn light" id="pricing-update">Update prices</button>' +
-      '<p class="caption" id="pricing-status" aria-live="polite"></p>';
-    byId('pricing-update').addEventListener('click', updatePricing);
-  }
-
-  async function updatePricing() {
-    const body = {};
-    byId('pricing-questions').querySelectorAll('[data-pq]').forEach(i => {
-      if (i.value !== '') body[i.dataset.pq] = Number(i.value);
-    });
-    const status = byId('pricing-status');
-    if (!Object.keys(body).length) { status.textContent = 'Enter at least one number first.'; return; }
-    byId('pricing-update').disabled = true;
-    status.textContent = 'Updating prices with your numbers…';
-    try {
-      const r = await fetch('/api/projects/' + encodeURIComponent(projectId) + '/revise', {method:'POST',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-      const j = await r.json();
-      if (!r.ok) throw Error(j.error || 'Could not update prices');
-      data.run.status = 'queued';
-      setTimeout(poll, 600);
-    } catch (err) {
-      status.textContent = err.message;
-      byId('pricing-update').disabled = false;
-    }
-  }
-
   function setResultView() {
     const hasNeeds = needs().length > 0 && !!data?.plan;
     byId('options').hidden = !hasNeeds;
@@ -389,7 +402,6 @@
         return editors + (editors === 1 ? ' editor' : ' editors') + ', ' +
           viewers + (viewers === 1 ? ' viewer' : ' viewers');
       })());
-    renderPricingQuestions(plan, data.run?.status === 'waiting_approval' && !approval);
     // Redraw only when something the owner sees has changed, so open rows and focus survive refreshes.
     const signature = JSON.stringify([plan.id, approval?.id, data.run?.status, data.run?.step, [...researching],
       needs().map(n => [n.id, toolsOf(n).map(t => t.tool_id + ':' + t.monthly_cost)])]);
@@ -422,10 +434,9 @@
         escape(c.description) + '</span><span class="badge ' + m[0] + '">' +
         escape(m[1]) + '</span></div>';
     }).join('');
-    const notes = data.research_notes || [];
-    const needsAttention = !data.plan?.options?.length;
-    byId('notes').hidden = !notes.length || !needsAttention;
-    byId('notes').innerHTML = notes.map(n => '<li>' + escape(n) + '</li>').join('');
+    // The research step's working notes stay in the API for debugging; owners see one plain line per need.
+    byId('notes').hidden = true;
+    byId('notes').innerHTML = '';
   };
 
   const originalRender = render;
@@ -455,23 +466,53 @@
       'Hide adjustments' : 'Adjust budget or team size';
     if (root.bloomRecoveryOpen) byId('recovery-details').open = true;
   });
-  // Remember which rows are open so a redraw never collapses them.
-  byId('options').addEventListener('toggle', e => {
-    const row = e.target.closest?.('[data-need-row]');
-    if (row) row.open ? openNeeds.add(row.dataset.needRow) : openNeeds.delete(row.dataset.needRow);
-  }, true);
-  byId('options').addEventListener('change', e => {
-    const input = e.target.closest('input[data-need]');
-    if (!input) return;
-    const id = input.dataset.need, value = input.value;
+  function choose(id, value) {
     picks[id] = value;
     suggestion = null;
     const tool = toolsOf(needById(id)).find(t => t.tool_id === value);
     const others = (tool?.also_fits || []).filter(other => picks[other] !== value);
     if (others.length) suggestion = {from: id, tool: value, name: tool.name, needs: others};
     picksChanged();
+  }
+  function openNeed(id) {
+    activeNeed = id;
+    suggestion = null;
+    drawNeeds();
+  }
+  byId('options').addEventListener('scroll', e => {
+    if (e.target.id !== 'carousel-track') return;
+    trackScroll[activeNeed] = e.target.scrollLeft;
+    updateCount();
+  }, true);
+  byId('options').addEventListener('keydown', e => {
+    if (e.target.id === 'carousel-track' && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      scrollTrack(e.key === 'ArrowRight' ? 1 : -1);
+    }
   });
   byId('options').addEventListener('click', e => {
+    const tab = e.target.closest('[data-tab]');
+    if (tab) { openNeed(tab.dataset.tab); return; }
+    const step = e.target.closest('[data-step]');
+    if (step) {
+      const list = needs(), i = list.findIndex(n => n.id === activeNeed) + Number(step.dataset.step);
+      if (list[i]) openNeed(list[i].id);
+      return;
+    }
+    const toggle = e.target.closest('[data-more]');
+    if (toggle) {
+      const id = toggle.dataset.more;
+      expandedPitch.has(id) ? expandedPitch.delete(id) : expandedPitch.add(id);
+      const text = toggle.previousElementSibling;  // toggle in place so the carousel doesn't jump
+      text.classList.toggle('open', expandedPitch.has(id));
+      toggle.textContent = expandedPitch.has(id) ? 'Less' : 'More';
+      toggle.setAttribute('aria-expanded', String(expandedPitch.has(id)));
+      return;
+    }
+    const arrow = e.target.closest('[data-scroll]');
+    if (arrow) { scrollTrack(Number(arrow.dataset.scroll)); return; }
+    const pick = e.target.closest('[data-pick]');
+    if (pick) { choose(pick.dataset.need, pick.dataset.pick); return; }
     const share = e.target.closest('[data-share]');
     if (share && suggestion) {
       if (share.dataset.share === 'yes') suggestion.needs.forEach(id => { picks[id] = suggestion.tool; });
@@ -492,7 +533,7 @@
       return;
     }
     const more = e.target.closest('[data-research]');
-    if (more) { openNeeds.add(more.dataset.research); researchMore([more.dataset.research]); return; }
+    if (more) { researchMore([more.dataset.research]); return; }
     if (e.target.closest('#save-selection')) saveSelection();
   });
 })(globalThis);

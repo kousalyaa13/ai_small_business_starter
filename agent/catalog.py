@@ -83,10 +83,12 @@ def match_discovered(component: Component, discovered: list[dict], limit=3) -> l
     for tool in discovered:
         if looks_like_article(tool["site"]):
             continue  # saved from a blog post before articles were filtered
+        # Reuse a tool only for the kind of need it was found for. The capability tags read from vendor
+        # pages are too broad (a staff scheduler tagged "appointment_booking" or "workflow_automation").
         if component.capability == "other":
             fits = any(needs_match(component.description, need) for need in tool["needs"])
         else:
-            fits = component.capability in tool["capabilities"]
+            fits = component.capability in tool.get("found_for", [])
         if not fits:
             continue
         checked = tool["last_checked"][:10]

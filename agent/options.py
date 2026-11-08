@@ -228,40 +228,6 @@ def build_options(components: list[Component], cands_by: dict[str, list[Candidat
     return options[:3]
 
 
-VOLUME_UNITS = {"monthly_bookings": "bookings", "monthly_calls": "calls", "monthly_messages": "messages",
-                "monthly_minutes": "call minutes", "monthly_tasks": "automated tasks"}
-
-
-def pricing_questions(options: list[Option], cands_by: dict[str, list[Candidate]], intake: Intake, limit=2) -> list[dict]:
-    """Questions asked after research, only when a shown plan's price depends on the answer."""
-    by_tool = {c.tool_id: c for lst in cands_by.values() for c in lst}
-    questions, asked = [], set()
-    for option in options:
-        for a in option.assignments:
-            cand = by_tool.get(a.tool_id)
-            plan = next((p for p in cand.plans if p.name == a.plan_name), None) if cand else None
-            if plan is None or a.source == "owned":
-                continue
-            if intake.usage.monthly_volume is None and "monthly_volume" not in asked:
-                key = next((k for k in VOLUME_UNITS if plan.included.get(k)), None)
-                if key:
-                    asked.add("monthly_volume")
-                    questions.append({"id": "pq_volume", "field": "monthly_volume", "tool": cand.name,
-                                      "question": f"About how many {VOLUME_UNITS[key]} a month do you expect? "
-                                                  f"{cand.name}'s {plan.name} plan includes up to "
-                                                  f"{plan.included[key]:,}, so the price may change."})
-            if intake.usage.contacts is None and "contacts" not in asked and plan.included.get("contacts"):
-                asked.add("contacts")
-                questions.append({"id": "pq_contacts", "field": "contacts", "tool": cand.name,
-                                  "question": f"About how many contacts will you store? {cand.name}'s {plan.name} "
-                                              f"plan includes up to {plan.included['contacts']:,}."})
-            if plan.per_seat and intake.usage.seats == 1 and "seats" not in asked:
-                asked.add("seats")
-                questions.append({"id": "pq_seats", "field": "seats", "tool": cand.name,
-                                  "question": f"How many people will use {cand.name}? It is priced per person "
-                                              f"and we have assumed 1."})
-    return questions[:limit]
-
 
 def component_tools(components: list[Component], cands_by: dict[str, list[Candidate]], intake: Intake) -> dict[str, list[dict]]:
     """Every tool found for each need, priced in code, with the other needs the same tool also fits."""

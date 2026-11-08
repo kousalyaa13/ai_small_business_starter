@@ -65,9 +65,10 @@ class CatalogAndOptionsTests(unittest.TestCase):
                               intake, self.catalog)
         self.assertEqual(other, [])
 
-    def test_discovered_tools_match_by_capability_or_wording(self):
+    def test_discovered_tools_match_by_found_for_or_wording(self):
         tool = {"tool_id": "web:calldesk.example", "name": "CallDesk", "site": "https://calldesk.example/",
-                "description": "", "capabilities": ["support_chat"], "plans": [{"name": "Solo", "monthly_price": 29}],
+                "description": "", "capabilities": ["support_chat"], "found_for": ["support_chat", "other"],
+                "plans": [{"name": "Solo", "monthly_price": 29}],
                 "evidence": [], "pricing_source_url": "", "last_checked": "2026-11-07T00:00:00+00:00",
                 "needs": ["Answer incoming phone calls and capture caller details"]}
         same_need = Component(id="c1", capability="other", description="Answer phone calls and capture leads",
@@ -80,6 +81,21 @@ class CatalogAndOptionsTests(unittest.TestCase):
         self.assertIn("earlier web research", found[0].notes[0])
         self.assertEqual(catalog.match_discovered(other_need, [tool]), [])
         self.assertEqual(len(catalog.match_discovered(tagged, [tool])), 1)
+
+    def test_saved_tools_are_reused_only_for_the_kind_of_need_they_were_found_for(self):
+        scheduler = {"tool_id": "web:deputy.example", "name": "Deputy", "site": "https://deputy.example/",
+                     "description": "Staff scheduling", "capabilities": ["appointment_booking", "workflow_automation"],
+                     "found_for": ["other"], "needs": ["Create staff shift schedules"], "plans": [], "evidence": [],
+                     "pricing_source_url": "", "last_checked": "2026-11-08T00:00:00+00:00"}
+        booking = Component(id="c1", capability="appointment_booking", description="Let customers book tables online",
+                            constraints=[], connects=[], search_query="")
+        sync = Component(id="c2", capability="workflow_automation", description="Move bookings between apps",
+                         constraints=[], connects=[], search_query="")
+        shifts = Component(id="c3", capability="other", description="Create and share staff shift schedules",
+                           constraints=[], connects=[], search_query="")
+        self.assertEqual(catalog.match_discovered(booking, [scheduler]), [])  # tagged, but not found for booking
+        self.assertEqual(catalog.match_discovered(sync, [scheduler]), [])
+        self.assertEqual([c.name for c in catalog.match_discovered(shifts, [scheduler])], ["Deputy"])
 
     def test_owned_software_ranks_first(self):
         intake = Intake(problem_text=EXAMPLE, existing_software=["Wix"])
@@ -183,23 +199,6 @@ class CatalogAndOptionsTests(unittest.TestCase):
                  Plan(name="Pro", monthly_price=79, included={"monthly_bookings": 1500})]
         self.assertEqual(choose_plan(plans, Usage(monthly_volume=200)).plan.name, "Starter")
         self.assertEqual(choose_plan(plans, Usage(monthly_volume=1200)).plan.name, "Pro")
-
-    def test_pricing_questions_only_when_a_price_depends_on_them(self):
-        from agent.options import pricing_questions
-        booking = Component(id="c1", capability="appointment_booking", description="Take reservations",
-                            constraints=[], connects=[], search_query="")
-        tool = catalog.Candidate(tool_id="web:tablebook.example", name="TableBook", source="web", vetted=False,
-                                 capabilities=[], plans=[Plan(name="Starter", monthly_price=29, included={"monthly_bookings": 300})])
-        seat_tool = catalog.Candidate(tool_id="web:staffapp.example", name="StaffApp", source="web", vetted=False,
-                                      capabilities=[], plans=[Plan(name="Team", monthly_price=4, per_seat=True)])
-        staff = Component(id="c2", capability="other", description="Staff scheduling", constraints=[], connects=[], search_query="")
-        cands = {"c1": [tool], "c2": [seat_tool]}
-        unknown = Intake(problem_text=EXAMPLE, monthly_budget=100)
-        qs = pricing_questions(build_options([booking, staff], cands, unknown), cands, unknown)
-        self.assertEqual([q["field"] for q in qs], ["monthly_volume", "seats"])
-        self.assertIn("up to 300", qs[0]["question"])
-        known = Intake(problem_text=EXAMPLE, monthly_budget=100, usage=Usage(seats=4, monthly_volume=250))
-        self.assertEqual(pricing_questions(build_options([booking, staff], cands, known), cands, known), [])
 
     def selection_setup(self):
         intake = Intake(problem_text=EXAMPLE, monthly_budget=30, usage=Usage(monthly_volume=50))

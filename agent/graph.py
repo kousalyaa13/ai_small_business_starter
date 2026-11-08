@@ -19,7 +19,7 @@ from . import catalog as catalog_mod
 from . import fit as fit_mod
 from .budget import Limits, Meter
 from .decompose import DECOMPOSE_INSTRUCTIONS, apply_answers, clean_decomposition, intake_prompt
-from .options import build_options, pricing_questions
+from .options import build_options
 from .research import Researcher, SearchClient, base_host
 from .schemas import Candidate, Component, Decomposition, Intake, PlanVersion
 from .store import now_iso
@@ -41,7 +41,6 @@ class AgentState(TypedDict, total=False):
     plan_version: int
     approval_id: str
     force_research: list[str]  # part ids the user asked to search again
-    pricing_questions: list[dict]  # asked after research, only if a shown plan's price depends on them
     research_goal: str  # "cheaper", "better" or "both"
 
 
@@ -182,8 +181,7 @@ def build_graph(deps: Deps, checkpointer):
         comps = [Component.model_validate(c) for c in state["components"]]
         cands = {cid: [Candidate.model_validate(c) for c in lst] for cid, lst in state["candidates"].items()}
         options = build_options(comps, cands, intake)
-        return {"options": [o.model_dump() for o in options],
-                "pricing_questions": pricing_questions(options, cands, intake)}
+        return {"options": [o.model_dump() for o in options]}
 
     def persist_plan(state):
         intake = intake_of(state)
@@ -193,8 +191,7 @@ def build_graph(deps: Deps, checkpointer):
             return PlanVersion(version=version, requirement_version=state["requirement_version"],
                                summary=state.get("summary", ""), monthly_budget=intake.monthly_budget,
                                usage=intake.usage, options=state["options"], gaps=gaps,
-                               research_notes=state.get("research_notes", []), created_at=now_iso(),
-                               pricing_questions=state.get("pricing_questions", [])).model_dump()
+                               research_notes=state.get("research_notes", []), created_at=now_iso()).model_dump()
 
         plan = store.persist_plan(state["project_id"], state["run_id"], state["requirement_version"], payload)
         return {"plan_id": plan["id"], "plan_version": plan["version"]}

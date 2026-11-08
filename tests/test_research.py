@@ -240,6 +240,7 @@ class ResearchTests(unittest.TestCase):
                          [("web:leadforms.example", "unvetted", 1)])
         self.assertEqual(tools[0]["plans"][0]["monthly_price"], 12.0)
         self.assertEqual(tools[0]["needs"], ["Collect form submissions"])
+        self.assertEqual(tools[0]["found_for"], ["form_capture"])  # reused only for this kind of need
         # A later run (new run id, so no cache) finds it again with a new price.
         _, run2 = self.store.create_project(Intake(problem_text=EXAMPLE).model_dump())
         self.PAGE = self.PAGE.replace("$12/month", "$15/month")

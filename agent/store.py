@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS discovered_tools (
     capabilities TEXT NOT NULL, needs TEXT NOT NULL, plans TEXT NOT NULL, evidence TEXT NOT NULL,
     pricing_source_url TEXT, status TEXT NOT NULL DEFAULT 'unvetted',
     first_seen TEXT NOT NULL, last_checked TEXT NOT NULL, times_seen INTEGER NOT NULL DEFAULT 1,
-    audience TEXT, setup_complexity TEXT, best_for TEXT, mentions INTEGER DEFAULT 0, small_business_fit INTEGER);
+    audience TEXT, setup_complexity TEXT, best_for TEXT, mentions INTEGER DEFAULT 0, small_business_fit INTEGER,
+    found_for TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS fit_cache (
     key TEXT PRIMARY KEY, fit TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS research_cache (
@@ -60,7 +61,8 @@ CREATE TABLE IF NOT EXISTS research_cache (
 
 
 DISCOVERED_COLUMNS = {"audience": "TEXT", "setup_complexity": "TEXT", "best_for": "TEXT",
-                      "mentions": "INTEGER DEFAULT 0", "small_business_fit": "INTEGER"}
+                      "mentions": "INTEGER DEFAULT 0", "small_business_fit": "INTEGER",
+                      "found_for": "TEXT NOT NULL DEFAULT '[]'"}  # capabilities of the needs a tool was found for
 
 
 class RunActive(Exception):
@@ -376,7 +378,7 @@ class Store:
                                "WHERE run_id=? GROUP BY kind", (run_id,)).fetchall()
         return {r["kind"]: dict(r) for r in rows}
 
-    def save_discovered(self, candidate, need):
+    def save_discovered(self, candidate, need, capability=None):
         """Upsert a web-discovered tool so later runs can reuse it.
 
         Rediscovery refreshes plans, evidence and last_checked, and merges capabilities and
@@ -384,16 +386,19 @@ class Store:
         """
         ts = now_iso()
         with self.tx() as con:
-            row = con.execute("SELECT capabilities, needs FROM discovered_tools WHERE tool_id=?",
+            row = con.execute("SELECT capabilities, needs, found_for FROM discovered_tools WHERE tool_id=?",
                               (candidate.tool_id,)).fetchone()
+            found_for = list(dict.fromkeys([*(json.loads(row["found_for"] or "[]") if row else []),
+                                            *([capability] if capability else [])]))
             caps = list(dict.fromkeys([*(json.loads(row["capabilities"]) if row else []), *candidate.capabilities]))
             needs = list(dict.fromkeys([*(json.loads(row["needs"]) if row else []), need]))[-10:]
             values = (candidate.name, candidate.site, candidate.description, json.dumps(caps), json.dumps(needs),
                       json.dumps([p.model_dump() for p in candidate.plans]),
                       json.dumps([e.model_dump() for e in candidate.evidence]), candidate.pricing_source_url, ts,
-                      candidate.audience, candidate.setup_complexity, candidate.best_for, candidate.mentions, 1)
+                      candidate.audience, candidate.setup_complexity, candidate.best_for, candidate.mentions, 1,
+                      json.dumps(found_for))
             columns = ("name, site, description, capabilities, needs, plans, evidence, pricing_source_url, "
-                       "last_checked, audience, setup_complexity, best_for, mentions, small_business_fit")
+                       "last_checked, audience, setup_complexity, best_for, mentions, small_business_fit, found_for")
             if row:
                 assignments = ", ".join(f"{c.strip()}=?" for c in columns.split(","))
                 con.execute(f"UPDATE discovered_tools SET {assignments}, times_seen=times_seen+1 WHERE tool_id=?",
@@ -414,7 +419,7 @@ class Store:
         tools = []
         for row in rows:
             tool = dict(row)
-            for key in ("capabilities", "needs", "plans", "evidence"):
+            for key in ("capabilities", "needs", "plans", "evidence", "found_for"):
                 tool[key] = json.loads(tool[key])
             tools.append(tool)
         return tools
