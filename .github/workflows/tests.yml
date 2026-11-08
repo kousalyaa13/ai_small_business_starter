@@ -24,5 +24,9 @@ jobs:
         env:
           AGENT_PROVIDER: stub
         run: python -m unittest discover -s tests -v
-      - name: Check recovery JavaScript syntax
-        run: node --check static/consult-recovery.js
+      - name: Check consultation JavaScript syntax
+        run: |
+          node --check static/consult-recovery.js
+          node --check static/consult-results.js
+      - name: Test recommendation grouping and pricing labels
+        run: node tests/test_consult_results.js
