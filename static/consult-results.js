@@ -207,9 +207,6 @@
         (t.plan_name ? '<small class="compare-plan">' + escape(t.plan_name) + '</small>' : '')) +
       row('Best for', t => escape(pitch(t) || 'Not specified')) +
       row('Setup type', t => escape(({'no-code':'✓ No-code','low-code':'◐ Low-code',developer:'Developer setup'})[t.setup_complexity] || 'Not confirmed')) +
-      row('Fit for this need', t => '<span class="' + (t.fit === 'built_for_this' ? 'compare-yes' : '') + '">' + status(t) + '</span>') +
-      row('Other needs covered', t => (t.also_fits || []).length ? escape((t.also_fits || []).map(id => needById(id)?.description).filter(Boolean).join('; ')) : '— Not confirmed') +
-      row('Listing details', t => t.vetted ? '✓ Reviewed' : 'Confirm with vendor') +
       row('Why this tool fits', fitDetail, 'compare-reason-row') +
       row('Your choice', select, 'compare-action-row') +
       '</tbody></table></div>' + pages + '</div>';
