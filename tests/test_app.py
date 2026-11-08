@@ -17,8 +17,8 @@ class AppTests(unittest.TestCase):
 
     def test_landing_sections_have_expected_order(self):
         page = self.client.get('/').get_data(as_text=True)
-        order = ['id="industries"', 'id="approach"',
-                 'id="solutions"', 'id="research"', 'id="stories"',
+        order = ['id="approach"', 'id="solutions"', 'id="industries"',
+             'id="research"', 'id="stories"',
                  'id="about"']
         positions = [page.index(anchor) for anchor in order]
         self.assertEqual(positions, sorted(positions))
