@@ -109,6 +109,7 @@ class Plan(BaseModel):
     billing: str = "unknown"
     per_seat: bool = False
     free_viewers: bool = False  # verified read-only access does not consume paid seats
+    min_seats: int = Field(1, ge=1, le=500)  # minimum paid members for this plan
     included: dict[str, int | None] = Field(default_factory=dict)
     evidence: str = ""
 
