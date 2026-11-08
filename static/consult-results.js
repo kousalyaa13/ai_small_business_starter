@@ -276,15 +276,6 @@
       return head + '<p class="caption native-note">Both steps happen in ' + escape(native.name) +
         ', so no separate connector is needed.</p>';
     }
-    const carousel = false && tools.length ?
-      '<div class="carousel"><div class="carousel-bar"><span class="caption carousel-count" id="carousel-count">' +
-      tools.length + (tools.length === 1 ? ' tool' : ' tools') + '</span>' +
-      '<span class="carousel-arrows"><button type="button" class="nav-btn" data-scroll="-1" aria-label="Previous tools">‹</button>' +
-      '<button type="button" class="nav-btn" data-scroll="1" aria-label="Next tools">›</button></span></div>' +
-      '<div class="carousel-track" id="carousel-track" role="list" tabindex="0" aria-label="Tools for this need">' +
-      tools.map(t => toolCard(need, t, canEdit, isNew(t), current)).join('') + '</div>' +
-      '</div>' :
-      '<p class="caption">No suitable tool found for this need yet. Mark it as already handled, skip it, or search for better options.</p>';
     const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
       (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
       (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
@@ -296,9 +287,8 @@
       [['recommended','Recommended'],['fit','Best fit'],['lowest','Lowest monthly cost']].map(([value,label]) =>
         '<button type="button" class="choice-chip' + (comparisonSort === value ? ' selected' : '') +
         '" data-sort="' + value + '" aria-pressed="' + (comparisonSort === value) + '">' + label + '</button>').join('') +
-      '</div>';
-    return head + searchBanner(need, tools.filter(isNew), current) + share + filters + compareTools(need, tools, canEdit) + carousel +
-      showAllLink +
+      (showAllLink ? '<span class="comparison-show-all">' + showAllLink + '</span>' : '') + '</div>';
+    return head + searchBanner(need, tools.filter(isNew), current) + share + filters + compareTools(need, tools, canEdit) +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
   }
