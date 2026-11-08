@@ -373,7 +373,22 @@
     const need = needById(activeNeed);
     byId('options').innerHTML = '<div class="needs-picker">' + needTabs(canEdit) +
       '<section class="need-panel' + (researching.has(activeNeed) ? ' is-searching' : '') + '" id="need-panel" role="tabpanel">' +
-      (need ? needPanel(need, canEdit, seen) : '') + '</section></div><div id="selection-summary">' + summaryHtml(canEdit) + '</div>';
+      (need ? needPanel(need, canEdit, seen) : '') + '</section></div>';
+    // Keep the live budget visible beside the section heading while comparing tools.
+    const toolbar = document.querySelector('.results-toolbar');
+    if (toolbar) {
+      let summary = byId('selection-summary');
+      if (!summary) {
+        summary = document.createElement('div');
+        summary.id = 'selection-summary';
+        summary.className = 'selection-summary-top';
+        toolbar.appendChild(summary);
+        summary.addEventListener('click', e => {
+          if (e.target.closest('#save-selection')) saveSelection();
+        });
+      }
+      summary.innerHTML = summaryHtml(canEdit);
+    }
     const track = byId('carousel-track');
     if (track) { track.scrollLeft = trackScroll[activeNeed] || 0; updateCount(); }
     byId('options').querySelector('.need-tab.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
