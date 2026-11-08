@@ -157,3 +157,23 @@
 .consultation-status .need-row{display:flex;align-items:center;gap:12px}
 .consultation-status .need-row>span:last-child{flex:1;min-width:0}
 .consultation-status .need-check{flex:none}
+
+/* Separate budget guidance and scannable tool comparison */
+#fit-card{margin-bottom:18px}
+#fit-card .recovery{margin-top:16px}
+.compare-wrap{margin:16px 0 20px;border:1px solid #e4dced;border-radius:16px;background:#fff;overflow:hidden}
+.compare-intro{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:17px 18px 12px;flex-wrap:wrap}
+.compare-intro h4{margin:4px 0 0;font-size:17px;color:#342445}
+.compare-scroll{overflow-x:auto}
+.compare-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:610px;font-size:12px}
+.compare-table th,.compare-table td{padding:12px 13px;border-top:1px solid #eee8f3;text-align:left;vertical-align:middle;overflow-wrap:anywhere}
+.compare-table thead th{background:#faf7ff;font-size:13px;color:#342445}
+.compare-table thead th:first-child,.compare-table tbody th{width:23%;color:#625873;font-weight:750}
+.compare-table tbody tr:nth-child(even){background:#fcfaff}
+.compare-table td strong{color:#432c62}
+.compare-yes{color:#11785f;font-weight:800}
+.compare-logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:white;border:1px solid #e7e0ee;border-radius:7px;margin-right:8px;vertical-align:middle}
+.compare-logo img{width:21px;height:21px;object-fit:contain}
+.compare-initial{display:inline-grid;place-items:center;width:24px;height:24px;color:#7546c8;font-weight:850;background:#f2e9fc;border-radius:6px}
+.compare-table thead th>span:last-child{vertical-align:middle}
+@media(max-width:700px){.compare-intro{align-items:flex-start}.compare-table{min-width:610px}}
