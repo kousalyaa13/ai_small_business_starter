@@ -47,7 +47,7 @@ KEYWORDS = {
     "online_store": ["online store", "sell online", "ecommerce", "e-commerce", "shop"],
     "ai_content": ["generate", "copy", "content", "design", "graphics", "write"],
     "budget_planning": ["budget development", "budget planning", "annual budget", "fiscal year", "fiscal-year", "create a budget", "develop my budget", "prepare budgets"],
-    "budget_tracking": ["budget tracking", "tracking budgets", "track my budget", "track our budget", "budget versus actual", "budget vs actual", "spending against budget"],
+    "budget_tracking": ["budget tracking", "budget development and tracking", "tracking every fiscal year", "tracking budgets", "track my budget", "track our budget", "budget versus actual", "budget vs actual", "spending against budget"],
     "financial_reporting": ["budget report", "fiscal reporting", "financial report", "variance report", "budget variance"],
     "budget_approvals": ["budget approval", "approve budgets", "approve the budget", "budget signoff", "budget sign-off"],
 }
