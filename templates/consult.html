@@ -200,10 +200,10 @@ function renderPlan(){
   return `<div class="option ${approval?.option_id===o.id?'chosen':''}"><div><span class="eyebrow" style="margin:0">${esc(o.title)}</span><p class="caption">${esc(o.summary)}</p></div>
   <div class="total ${cls}">${money(o.monthly_total)}<small> /month${o.total_is_complete?'':' + unknown'} · ${esc(label)}</small></div>
   <div class="alist">${o.assignments.map(a=>{const s=SRC[a.source]||SRC.none;return `<div class="arow"><span class="cost">${a.monthly_cost==null?'price unknown':money(a.monthly_cost)}</span>
-   <b>${esc(a.tool_name)}</b>${a.plan_name?' · '+esc(a.plan_name):''} <span class="badge ${s[0]}">${esc(s[1])}</span>${setupTag(a)}${bestFor(a)}<br><small class="caption">${esc(a.capability.replaceAll('_',' '))}${a.cost_basis?' — '+esc(a.cost_basis):''}</small>${altList(a)}</div>`}).join('')}</div>
+   <b>${esc(a.tool_name)}</b>${a.plan_name?' · '+esc(a.plan_name):''} <span class="badge ${s[0]}">${esc(s[1])}</span>${setupTag(a)}${bestFor(a)}<br><small class="caption">${esc(a.capability.replaceAll('_',' '))}${a.cost_basis?' — '+esc(a.cost_basis):''}</small></div>`}).join('')}</div>
   <details><summary>Assumptions & setup</summary><ul>${o.assumptions.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul><b>Setup</b><ul>${o.setup_requirements.map(x=>'<li>'+esc(x)+'</li>').join('')}</ul></details>
   <details><summary>Sources (${o.sources.length})</summary><ul>${o.sources.map(u=>`<li><a href="${safeUrl(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a></li>`).join('')}</ul></details>
-  ${canApprove?`<button class="btn blue" data-approve="${esc(o.id)}" type="button">Approve this option</button>`:''}</div>`}).join('');
+  ${canApprove?`<button class="btn blue" data-approve="${esc(o.id)}" type="button">Choose this plan</button>`:''}</div>`}).join('');
  $('options').querySelectorAll('[data-approve]').forEach(b=>b.addEventListener('click',()=>approve(b.dataset.approve,plan.version)));
  $('approved').hidden=!approval;
  if(approval){const o=plan.options.find(x=>x.id===approval.option_id);
@@ -214,12 +214,6 @@ function renderPlan(){
 const SETUP={'no-code':'No-code','low-code':'Low-code',developer:'Developer setup'};
 function setupTag(x){const t=SETUP[x.setup_complexity];return t?` <span class="badge ${x.setup_complexity==='developer'?'b-none':'b-pending'}">${esc(t)}</span>`:''}
 function bestFor(x){return x.best_for?` <span class="caption">· ${esc(x.best_for)}</span>`:''}
-function altList(a){
- const alts=a.alternatives||[];if(!alts.length)return '';
- return `<details class="alts"><summary>${alts.length} other tool${alts.length>1?'s':''} fit this part</summary><ul>${alts.map(x=>{const s=SRC[x.source]||SRC.web;
-  return `<li><a href="${safeUrl(x.site)}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a> <span class="badge ${s[0]}">${esc(s[1])}</span>${setupTag(x)} — ${x.monthly_cost==null?'price not listed':money(x.monthly_cost)+'/month'}${x.plan_name&&x.monthly_cost!=null?' ('+esc(x.plan_name)+')':''}${bestFor(x)}</li>`}).join('')}</ul></details>`;
-}
-
 async function approve(optionId,version){
  approveKey=approveKey||('apr-'+(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2)));
  document.querySelectorAll('[data-approve]').forEach(b=>b.disabled=true);$('approve-error').hidden=true;
