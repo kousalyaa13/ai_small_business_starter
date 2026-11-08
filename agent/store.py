@@ -282,6 +282,9 @@ class Store:
             if option_id not in options:
                 raise UnknownOption("Choose one of the listed options.")
             option = options[option_id]
+            if (not option["total_is_complete"]
+                    or any(a["source"] == "none" for a in option["assignments"])):
+                raise UnknownOption("This option has unresolved tools or prices. Refine your request before approving.")
             recurring = {"monthly_total": option["monthly_total"], "total_is_complete": option["total_is_complete"],
                          "tools": [{"tool": a["tool_name"], "plan": a["plan_name"], "monthly_cost": a["monthly_cost"]}
                                    for a in option["assignments"]], "assumptions": option["assumptions"]}
