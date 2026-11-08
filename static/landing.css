@@ -381,3 +381,8 @@ html,body{max-width:100%}
 .research-quotes-grid .research-quote blockquote{font-size:clamp(16px,1.55vw,21px);line-height:1.45}
 .research-stories{margin-top:27px}
 @media(max-width:760px){.research-quotes-grid{grid-template-columns:1fr;gap:13px}.research-quotes-grid .research-quote{padding:18px}}
+
+/* Keep the full small-business neighborhood illustration visible in the hero. */
+.hero .photo-wrap{background:#b7e5f2}
+.hero .photo-wrap img{object-fit:contain;object-position:center}
+.hero .photo-wrap::after{display:none}
