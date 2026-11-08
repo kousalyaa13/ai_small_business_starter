@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Northstar — Your AI business dashboard</title>
+<title>BloomBot AI — Your AI business dashboard</title>
 <style>
 :root{--ink:#162336;--muted:#687587;--line:#e5eaf0;--page:#f7f8f7;--blue:#345fe7;--teal:#108c78;--amber:#c37923;--violet:#6b4cbd;--red:#a62f42}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}a:hover{text-decoration:none}
@@ -50,7 +50,7 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
 </head>
 <body>
 <header class="top">
-<a class="logo" href="/" aria-label="Northstar home"><span class="logo-mark">✳</span> Northstar<span>AI</span></a>
+<a class="logo" href="/" aria-label="BloomBot AI home"><span class="logo-mark">✳</span> BloomBot<span>AI</span></a>
 <div class="top-actions"><a class="btn light" href="/consult" id="consult-link">Describe a problem →</a><button id="edit-btn" class="btn light" hidden>Edit answers</button></div>
 </header>
 <main class="shell">
@@ -164,7 +164,7 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
   </div>
  </details>
 
- <p class="bottom-note">Northstar AI prototype · Recommendations are rules-based suggestions, not endorsements · Prices come from vendor sites on the date shown; confirm before buying · No outside accounts are connected.</p>
+ <p class="bottom-note">BloomBot AI prototype · Recommendations are rules-based suggestions, not endorsements · Prices come from vendor sites on the date shown; confirm before buying · No outside accounts are connected.</p>
 </section>
 </main>
 <div id="print-area" aria-hidden="true"></div>
@@ -178,7 +178,7 @@ const dateText=d=>{const t=new Date(d+'T00:00:00');return isNaN(t)?d:t.toLocaleD
 function note(el,text){el.hidden=false;el.textContent=text;}
 function priceText(p){if(!p)return 'Price not confirmed';return p.monthly_cost===0?`${p.plan} plan · Free`:`${p.plan} plan · ${money(p.monthly_cost)}/month${p.billing==='annual'?' (billed yearly)':''}`}
 function budgetTag(p){if(!p||p.within_budget==null)return ['unknown','Check price'];return p.within_budget?['ok','Within budget']:['over','Over budget']}
-function stepsKey(){return 'northstar-simple-plan:'+String(profile.business||'demo').toLowerCase()+':'+String(report?.problem||'unknown');}
+function stepsKey(){return 'bloombot-ai-simple-plan:'+String(profile.business||'demo').toLowerCase()+':'+String(report?.problem||'unknown');}
 function progressLoad(){try{const saved=JSON.parse(localStorage.getItem(stepsKey())||'[]');completed=report.steps.map((s,i)=>saved[i]===true)}catch{completed=report.steps.map(()=>false)}}
 function renderProgress(){
  const done=completed.filter(Boolean).length;
@@ -287,7 +287,7 @@ $('preview-btn').addEventListener('click',runPreview);
 $('export-btn').addEventListener('click',()=>{
  if(!report)return;const top=report.tools?.[0];const p=top?.price_estimate;const audit=report.software_audit||{};const r=report.readiness||{};
  const readiness=(r.unanswered||[]).length?'Not checked':r.score+'/100 — '+r.status;
- $('print-area').innerHTML=`<div class="print-meta"><span>Northstar AI · Decision Passport</span><h1>${esc(profile.business||'Your business')}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
+ $('print-area').innerHTML=`<div class="print-meta"><span>BloomBot AI · Decision Passport</span><h1>${esc(profile.business||'Your business')}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
  <h2>Suggested starting point</h2><p>${esc(top?.name||'Your current software')}: ${esc(priceText(p))}${p?.source_url?' (price checked '+esc(dateText(p.checked_at))+', '+esc(p.source_url)+')':''}. ${esc(top?.description||'')}</p>
  <h2>Your situation</h2><p>Current software: ${esc(profile.software)} · Budget: ${money(Number(profile.budget||0))}/month · Readiness: ${esc(readiness)}</p><p>${esc(audit.try_first||'')}</p>
  <h2>Value estimate (your assumptions)</h2><p>Monthly cost: ${money(costModel.monthly||0)}. Monthly net value: ${money(costModel.net||0)}. First year: ${money(costModel.yearOne||0)}. Estimates, not guaranteed savings.</p>

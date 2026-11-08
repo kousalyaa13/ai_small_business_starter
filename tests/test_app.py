@@ -9,7 +9,7 @@ class AppTests(unittest.TestCase):
     def test_home(self):
         r = self.client.get('/')
         self.assertEqual(r.status_code, 200)
-        self.assertIn(b'Northstar', r.data)
+        self.assertIn(b'BloomBot', r.data)
         self.assertIn(b'id="dashboard"', r.data)
         self.assertIn(b'Calculate your potential value', r.data)
         self.assertNotIn(b'Business health check</button>', r.data)

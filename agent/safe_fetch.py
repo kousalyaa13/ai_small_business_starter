@@ -15,7 +15,7 @@ from urllib.robotparser import RobotFileParser
 import requests
 from bs4 import BeautifulSoup
 
-USER_AGENT = "NorthstarResearchBot/0.1 (+vendor pricing research)"
+USER_AGENT = "BloomBotResearchBot/0.1 (+vendor pricing research)"
 
 
 class FetchError(Exception):

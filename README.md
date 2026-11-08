@@ -1,4 +1,4 @@
-# Northstar AI — one-page small business decision dashboard
+# BloomBot AI — one-page small business decision dashboard
 
 A hackathon proof of concept that helps small-business owners evaluate whether they need AI, compare a few suitable options, preview a workflow, and plan a limited pilot.
 
