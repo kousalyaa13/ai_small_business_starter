@@ -14,7 +14,7 @@
     <a class="brand" href="/" aria-label="BloomBots home"><img class="brand-mascot" src="{{ url_for('static', filename='sproutbot.svg') }}" alt="" aria-hidden="true">BloomBots<span class="brand-period">.</span></a>
   <button class="menu-toggle" id="menu-toggle" aria-label="Open navigation" aria-controls="primary-nav" aria-expanded="false">☰</button>
   <nav id="primary-nav" class="nav-links" aria-label="Main navigation">
-   <a href="#industries">Industries</a><a href="#approach">How it works</a><a href="#research">Research</a><a href="#about">About us</a>
+   <a href="#approach">How it Works</a><a href="#industries">Your Growth Plan</a><a href="#research">Research</a><a href="#about">About Us</a>
    <a class="nav-cta" href="/consult">Help my business bloom <span aria-hidden="true">↗</span></a>
   </nav>
  </div>
@@ -37,6 +37,18 @@
   </div>
  </div>
  <div class="container"><div class="hero-bottom"><span>BUILT FOR REAL SMALL-BUSINESS NEEDS</span><span>One step at a time <span aria-hidden="true">↗</span></span></div></div>
+</section>
+<section class="section reveal solution-section" id="approach">
+ <div class="container growth-journey">
+  <div class="growth-intro"><span class="eyebrow">HOW BLOOMBOTS WORKS</span><h2>A little guidance. <em>A lot of growth.</em></h2><p>Three simple steps to find the right tools for your business.</p></div>
+  <div class="growth-stages" role="group" aria-label="Explore the three BloomBots steps">
+   <button class="growth-stage is-active" type="button" aria-expanded="true" aria-controls="growth-detail" data-growth="0"><span class="growth-art seed-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-seed.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">01</span><strong>Seed</strong><small>Tell us your challenge</small><span class="growth-hint">Explore step ↗</span></button>
+   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="1"><span class="growth-art sprout-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-sprout.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">02</span><strong>Sprout</strong><small>Explore your options</small><span class="growth-hint">Explore step ↗</span></button>
+   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="2"><span class="growth-art bloom-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-bloom.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">03</span><strong>Bloom</strong><small>Grow with a plan</small><span class="growth-hint">Explore step ↗</span></button>
+  </div>
+  <div class="growth-detail" id="growth-detail" role="region" aria-live="polite" aria-label="Selected growth step"><span class="growth-detail-label" id="growth-detail-label">STEP 01 · SEED</span><h3 id="growth-detail-title">Start with what's slowing you down.</h3><p id="growth-detail-copy">Describe your business challenge in your own words. Add your budget and existing tools whenever you're ready.</p></div>
+  <div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div>
+ </div>
 </section>
 <section class="section reveal starter-section" id="industries">
  <div class="container">
@@ -72,24 +84,12 @@
   </form>
  </div>
 </section>
-<section class="section reveal solution-section" id="approach">
- <div class="container growth-journey">
-  <div class="growth-intro"><span class="eyebrow">HOW BLOOMBOTS WORKS</span><h2>A little guidance. <em>A lot of growth.</em></h2><p>Three simple steps to find the right tools for your business.</p></div>
-  <div class="growth-stages" role="group" aria-label="Explore the three BloomBots steps">
-   <button class="growth-stage is-active" type="button" aria-expanded="true" aria-controls="growth-detail" data-growth="0"><span class="growth-art seed-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-seed.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">01</span><strong>Seed</strong><small>Tell us your challenge</small><span class="growth-hint">Explore step ↗</span></button>
-   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="1"><span class="growth-art sprout-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-sprout.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">02</span><strong>Sprout</strong><small>Explore your options</small><span class="growth-hint">Explore step ↗</span></button>
-   <button class="growth-stage" type="button" aria-expanded="false" aria-controls="growth-detail" data-growth="2"><span class="growth-art bloom-art" aria-hidden="true"><img class="growth-illustration" src="{{ url_for('static', filename='growth-bloom.svg') }}" alt="" aria-hidden="true" loading="lazy"></span><span class="growth-number">03</span><strong>Bloom</strong><small>Grow with a plan</small><span class="growth-hint">Explore step ↗</span></button>
-  </div>
-  <div class="growth-detail" id="growth-detail" role="region" aria-live="polite" aria-label="Selected growth step"><span class="growth-detail-label" id="growth-detail-label">STEP 01 · SEED</span><h3 id="growth-detail-title">Start with what's slowing you down.</h3><p id="growth-detail-copy">Describe your business challenge in your own words. Add your budget and existing tools whenever you're ready.</p></div>
-  <div class="toolkit-inline" id="solutions"><div><span class="eyebrow dark">YOUR GROWTH TOOLKIT</span><h3>Practical tools, <em>clearer choices.</em></h3></div><div class="toolkit-links">{% for service in content.services %}<a href="/solutions#{{ service.id }}"><span aria-hidden="true">{{ service.icon }}</span>{{ service.title }} <span aria-hidden="true">↗</span></a>{% endfor %}</div></div>
- </div>
-</section>
 <section class="section reveal research-section" id="research">
  <div class="container">
   <div class="section-heading-row"><div><span class="eyebrow">WHY WE BUILT BLOOMBOTS</span><h2>Small businesses.<br><em>Big impact.</em></h2></div><p>AI is opening doors. Finding the right tools shouldn't be the hard part.</p></div>
   <div class="stats-grid">
   {% for stat in content.stats %}
-   <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
+   <article class="stat-card"><div class="stat-number">{{ stat.value }}</div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
   <div class="research-quotes-grid">
