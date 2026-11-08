@@ -83,9 +83,8 @@
    <article class="stat-card"><div class="stat-number">{{ stat.value }}<span class="stat-accent">↗</span></div><h3>{{ stat.title }}</h3><p>{{ stat.description }}</p><a href="{{ stat.source_url }}" target="_blank" rel="noopener noreferrer">{{ stat.source_name }} · {{ stat.year }} ↗</a></article>
   {% endfor %}
   </div>
-  <div class="research-foot"><a href="/solutions#verification">Our research standard <span aria-hidden="true">↗</span></a></div>
   <div class="research-stories" id="stories">
-   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>Hear from people building businesses.</h3></div><p>Independent talks for perspective—not BloomBots testimonials or endorsements.</p></div>
+   <div class="research-stories-heading"><div><span class="eyebrow">ROOTED IN REAL EXPERIENCES</span><h3>Hear from people building businesses.</h3></div></div>
    <div class="story-video-grid">
     {% for video in content.videos[:2] %}
     <article class="story-video-card">
