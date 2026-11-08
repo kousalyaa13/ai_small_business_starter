@@ -122,7 +122,7 @@
   // "Reviewed" is about the listing (price and details checked), not about fit for this job.
   const trustTag = t => t.vetted ?
     '<span class="trust-label trust-reviewed" title="Our team checked this tool’s price and details. It says nothing about fit for your need.">Reviewed listing</span>' :
-    '<span class="trust-label trust-check" title="Found by web research; confirm details on the vendor’s site.">Verify details</span>';
+    '<span class="trust-label trust-check" title="Found by web research; confirm details on the vendor’s site.">Unverified</span>';
   const FIT = {built_for_this: ['fit-good', 'Built for this'], workable: ['fit-ok', 'Works, with limits'],
                poor: ['fit-poor', 'Not designed for this']};
   const fitBlock = t => FIT[t.fit] ? '<span class="tool-fit ' + FIT[t.fit][0] + '"><b>' + FIT[t.fit][1] + '</b>' +
@@ -428,15 +428,13 @@
     byId('needs-details').hidden = !comps.length;
     byId('needs-summary').textContent = 'What we understood · ' + comps.length +
       (comps.length === 1 ? ' task' : ' tasks');
-    byId('components').innerHTML = comps.map(c => {
-      const m = MATCH[c.match] || MATCH.pending;
-      return '<div class="need-row"><span class="need-check">✓</span><span>' +
-        escape(c.description) + '</span><span class="badge ' + m[0] + '">' +
-        escape(m[1]) + '</span></div>';
-    }).join('');
-    // The research step's working notes stay in the API for debugging; owners see one plain line per need.
+    byId('components').innerHTML = comps.map(c =>
+      '<div class="need-row"><span class="need-check" aria-hidden="true">✓</span><span>' +
+        escape(c.description) + '</span></div>'
+    ).join('');
+    // Internal research diagnostics are not useful in the customer-facing checklist.
     byId('notes').hidden = true;
-    byId('notes').innerHTML = '';
+    byId('notes').replaceChildren();
   };
 
   const originalRender = render;
@@ -451,11 +449,12 @@
       'takes about a minute. Your current picks stay below; new tools will be marked “New”.';
     if (ready) {
       byId('summary').textContent = data.approval ? 'Your plan is saved' :
-        complete ? 'Choose a tool for each need' : 'We need a little more information to find a match';
+        complete ? "Here's what your business needs" : 'We need a little more information to find a match';
     }
-    byId('consult-goal').hidden = !ready;
-    byId('consult-goal').textContent = data?.intake?.problem_text ?
-      'Your goal: ' + data.intake.problem_text : '';
+    // The detailed original request is already captured in the consultation.
+    // Keep this screen focused on the specific needs we identified.
+    byId('consult-goal').hidden = true;
+    byId('consult-goal').textContent = '';
     if (!ready) byId('needs-details').open = true;
   };
 

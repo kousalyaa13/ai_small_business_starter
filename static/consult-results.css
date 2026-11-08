@@ -153,3 +153,7 @@
 @media(max-width:900px){.carousel-track{grid-auto-columns:calc((100% - 14px)/2)}}
 @media(max-width:600px){.carousel-track{grid-auto-columns:88%}.need-tab{max-width:200px}.need-nav .nav-btn{padding:6px 9px}}
 .need-note{margin:4px 0 0;max-width:620px}
+/* Concise needs checklist: no research-origin badges or raw goal paragraph. */
+.consultation-status .need-row{display:flex;align-items:center;gap:12px}
+.consultation-status .need-row>span:last-child{flex:1;min-width:0}
+.consultation-status .need-check{flex:none}
