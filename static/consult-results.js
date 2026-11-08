@@ -473,7 +473,6 @@
   function setResultView() {
     const hasNeeds = needs().length > 0 && !!data?.plan;
     byId('options').hidden = !hasNeeds;
-    byId('adjust-toggle').hidden = !hasNeeds || !data?.recovery || !!data.approval;
     byId('selection-note').hidden = !hasNeeds || !!data.approval;
   }
   root.bloomSetResultView = setResultView;
@@ -558,13 +557,6 @@
     if (!ready) byId('needs-details').open = true;
   };
 
-  byId('adjust-toggle').addEventListener('click', () => {
-    root.bloomRecoveryOpen = !root.bloomRecoveryOpen;
-    if (typeof root.bloomRenderRecovery === 'function') root.bloomRenderRecovery();
-    byId('adjust-toggle').textContent = root.bloomRecoveryOpen ?
-      'Hide adjustments' : 'Adjust budget or team size';
-    if (root.bloomRecoveryOpen) byId('recovery-details').open = true;
-  });
   function choose(id, value) {
     picks[id] = value;
     suggestion = null;
