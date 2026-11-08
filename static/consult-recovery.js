@@ -36,13 +36,14 @@
     const plan = data && data.plan;
     const recovery = data && data.recovery;
     const approved = data && data.approval;
-    panel.hidden = !plan || !recovery || !!approved;
-    if (panel.hidden) return;
-
-    const usable = (plan.options || []).some(o => o.total_is_complete &&
+    const usable = !!(plan?.options || []).some(o => o.total_is_complete &&
       (o.assignments || []).every(a => a.source !== 'none'));
     const noneFound = !usable;
-    $('options').hidden = noneFound;
+    panel.hidden = !plan || !recovery || !!approved || (usable && !globalThis.bloomRecoveryOpen);
+    panel.classList.toggle('has-matches', usable);
+    if (panel.hidden) return;
+    $('options').hidden = noneFound || !!globalThis.bloomCompareActive;
+    $('compare-view').hidden = noneFound || !globalThis.bloomCompareActive;
     $('approve-line').hidden = noneFound || data.run?.status !== 'waiting_approval';
 
     // Never allow approving a placeholder gap or a plan with an unknown total.
@@ -75,7 +76,7 @@
     $('recovery-budget').value = recovery.budget == null ? '' : recovery.budget;
     $('recovery-problem').value = data.intake?.problem_text || '';
     $('recovery-error').hidden = true;
-    $('recovery-details').open = noneFound || recovery.status === 'over_budget' || recovery.editors == null;
+    $('recovery-details').open = noneFound || !!globalThis.bloomRecoveryOpen;
     updatePriceExplorer();
   }
 
@@ -150,6 +151,7 @@
     ' A priced product is not proof it meets all your fiscal-budget requirements.</p>';
   }
 
+  globalThis.bloomRenderRecovery = renderRecovery;
   $('editor-slider').addEventListener('input', updatePriceExplorer);
   $('recovery-budget').addEventListener('input', updatePriceExplorer);
   $('recovery-apply').addEventListener('click', async () => {
