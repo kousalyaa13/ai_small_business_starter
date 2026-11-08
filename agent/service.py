@@ -4,12 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from .budget import Limits, Meter
+from .catalog import load_catalog as default_catalog
+from .recovery import recovery_for
 from .graph import Deps, build_graph, sqlite_checkpointer
 from .llm import default_model
 from .research import default_fetcher, default_search
 from .runner import Runner
-from .schemas import Answers, ApprovalRequest, Intake
-from .store import Store
+from .schemas import Answers, ApprovalRequest, Intake, RevisionRequest
+from .store import RunActive, Store
 
 AUTHORIZED_ACTIONS = ["record_selected_plan"]  # build/deploy actions arrive in a later milestone
 
@@ -28,8 +30,8 @@ class Conflict(Exception):
 
 
 class AgentService:
-    def __init__(self, store: Store, runner: Runner):
-        self.store, self.runner = store, runner
+    def __init__(self, store: Store, runner: Runner, catalog_loader=default_catalog):
+        self.store, self.runner, self.catalog_loader = store, runner, catalog_loader
 
     @classmethod
     def create(cls, db_path, checkpoint_path=None, model=None, search=DEFAULT, fetcher=DEFAULT,
@@ -44,7 +46,7 @@ class AgentService:
         if load_catalog:
             deps.load_catalog = load_catalog
         graph = build_graph(deps, sqlite_checkpointer(checkpoint_path))
-        return cls(store, Runner(store, graph, executor=executor))
+        return cls(store, Runner(store, graph, executor=executor), deps.load_catalog)
 
     def _project(self, project_id, org_id):
         project = self.store.get_project(project_id)
@@ -63,6 +65,30 @@ class AgentService:
         if not run or run["status"] != "waiting_input":
             raise Conflict("This project is not waiting for answers.")
         self.runner.submit(run["id"], resume=body.answers, from_statuses=("waiting_input",))
+
+    def revise(self, project_id, req: RevisionRequest, org_id="default"):
+        """Save new assumptions and recompute options, preserving old versions."""
+        self._project(project_id, org_id)
+        _, previous = self.store.latest_requirements(project_id)
+        data = dict(previous)
+        changes = req.model_dump(exclude_unset=True, exclude_none=True)
+        if not changes:
+            raise ValueError("Change the budget, number of editors, team size or problem to try again.")
+        usage = dict(data.get("usage") or {})
+        for field in ("seats", "editors"):
+            if field in changes:
+                usage[field] = changes.pop(field)
+        data["usage"] = usage
+        data.update(changes)
+        intake = Intake.model_validate(data)
+        if intake.model_dump() == Intake.model_validate(previous).model_dump():
+            raise ValueError("No requirements changed. Adjust a value to generate a new plan.")
+        try:
+            version, run_id = self.store.revise_project(project_id, intake.model_dump())
+        except RunActive as exc:
+            raise Conflict(str(exc)) from exc
+        self.runner.submit(run_id)
+        return version, run_id
 
     def approve(self, project_id, req: ApprovalRequest, org_id="default"):
         from .store import AlreadyApproved, StalePlan, UnknownOption
@@ -89,6 +115,8 @@ class AgentService:
             run = self.store.latest_run(project_id)
         version, intake = self.store.latest_requirements(project_id)
         plan = self.store.latest_plan(project_id)
+        if plan and plan["requirement_version"] != version:
+            plan = None  # don't display the previous plan while revised options are building
         approval = self.store.approval_for_plan(plan["id"]) if plan else None
         snap = run["snapshot"] if run else {}
         components = []
@@ -104,6 +132,7 @@ class AgentService:
                                "candidates": [{"name": c["name"], "source": c["source"], "vetted": c["vetted"],
                                                "site": c["site"]} for c in (cands or [])[:3]]})
         usage = Meter(self.store, run["id"], project_id, Limits.from_env()).totals() if run else {}
+        recovery = recovery_for(Intake.model_validate(intake), snap.get("components", []), self.catalog_loader()) if plan else None
         return {
             "project": {"id": project["id"], "created_at": project["created_at"]},
             "requirement_version": version, "intake": intake,
@@ -112,5 +141,5 @@ class AgentService:
             "questions": snap.get("questions", []) if run and run["status"] == "waiting_input" else [],
             "components": components, "research_notes": snap.get("research_notes", []),
             "plan": {"id": plan["id"], "version": plan["version"], **plan["payload"]} if plan else None,
-            "approval": approval, "usage": usage,
+            "approval": approval, "usage": usage, "recovery": recovery,
         }
