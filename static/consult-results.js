@@ -149,7 +149,7 @@
     const single = tools.length === 1;
     const allVetted = tools.length > 0 && tools.every(t => t.vetted);
     const title = single ? first.name : tools.length + '-tool solution';
-    const label = index === 0 && o.within_budget === true ? 'Lowest-cost option' :
+    const label = /lowest monthly cost/i.test(o.title) ? 'Lowest-cost option' :
       /alternative/i.test(o.title) ? 'Alternative' : o.title;
     const shortDesc = single && first.description ? first.description :
       o.summary || 'A combination of products selected for your needs.';
@@ -227,7 +227,8 @@
     const button = byId('compare-toggle');
     button.hidden = options.length < 2;
     button.textContent = comparing ? '← Back to recommendations' : 'Compare tools ↔';
-    byId('adjust-toggle').hidden = !data?.recovery || !!data.approval;
+    byId('adjust-toggle').hidden = !hasOptions || !data?.recovery || !!data.approval;
+    byId('selection-note').hidden = !hasOptions || !!data.approval;
   }
   root.bloomSetResultView = setResultView;
   root.bloomCompareActive = false;
@@ -303,7 +304,7 @@
   });
   byId('adjust-toggle').addEventListener('click', () => {
     root.bloomRecoveryOpen = !root.bloomRecoveryOpen;
-    if (typeof renderRecovery === 'function') renderRecovery();
+    if (typeof root.bloomRenderRecovery === 'function') root.bloomRenderRecovery();
     byId('adjust-toggle').textContent = root.bloomRecoveryOpen ?
       'Hide adjustments' : 'Adjust budget or team size';
     if (root.bloomRecoveryOpen) byId('recovery-details').open = true;
