@@ -309,3 +309,17 @@
 .approved-download{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:18px}
 .approved-download .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:44px}
 .approved-download .caption{max-width:420px}
+
+
+/* Evidence is available on demand, without turning the comparison into a security scorecard. */
+.compare-trust-row td{vertical-align:top}
+.trust-disclosure summary{display:flex;align-items:center;gap:7px;flex-wrap:wrap;cursor:pointer;list-style:none}
+.trust-disclosure summary::-webkit-details-marker{display:none}
+.trust-disclosure summary .trust-label{font-size:10px;padding:4px 8px;white-space:normal}
+.trust-open{font-size:11px;color:#7546c8;font-weight:800;text-decoration:underline;text-underline-offset:2px}
+.trust-disclosure[open] .trust-open{color:#5f5271}
+.trust-evidence{border-top:1px solid #ebe5f2;margin-top:10px;padding-top:9px}
+.trust-evidence p{margin:0 0 8px;font-size:11px;line-height:1.5;color:#514963}
+.trust-evidence b{color:#352946}
+.trust-evidence a{font-weight:750;color:#6942b5;overflow-wrap:anywhere}
+.trust-evidence .trust-caution{padding:9px 10px;background:#f8f4fd;border-radius:8px;color:#6c5c79;font-size:10px;margin:10px 0 0}
