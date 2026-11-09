@@ -35,6 +35,12 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
 .more-body{padding:0 20px 20px;display:grid;gap:12px}
 .tool-row{border:1px solid #e2e7ef;border-radius:12px;margin-bottom:8px}.tool-row>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:12px 14px;flex-wrap:wrap}.tool-row>summary::-webkit-details-marker{display:none}.tool-row b{font-size:14px}.tool-row .meta{margin-left:auto;font-size:13px;font-weight:700;color:#34445b}.tag{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;background:#edf1ff;color:var(--blue)}.tag.ok{background:#e4f6ef;color:#0b6a50}.tag.over{background:#fdeceb;color:var(--red)}.tag.unknown{background:#f1f3f7;color:#5d6a7e}
 .tool-detail{padding:0 14px 14px;font-size:13px}.tool-detail p{margin:6px 0}
+.source-check{margin-top:13px;border:1px solid #e7e0f0;border-radius:10px;background:#fcfaff}
+.source-check>summary{padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;font-weight:800;color:#604487}
+.source-check-body{padding:0 12px 12px;font-size:12px;color:#514963}
+.source-check-body p{margin:8px 0;line-height:1.5}
+.source-check-body a{font-weight:750;overflow-wrap:anywhere}
+.source-check-body .source-caution{padding:10px;background:#f2ebfa;border-radius:8px;color:#665576;font-size:11px}
 .cost-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.cost-grid label{font-size:12px;font-weight:750;color:#44675d}.cost-grid input{margin-top:6px}.savings{border-top:1px solid #c8e8d9;display:flex;align-items:end;justify-content:space-between;gap:12px;padding-top:14px}.savings strong{font-size:30px;color:#087a5b;letter-spacing:-1px}
 .inner{font-size:13px}.inner summary{cursor:pointer;color:#425371;font-weight:700}.inner .cost-grid{margin-top:10px}
 .toggle{display:inline-flex;padding:3px;background:#f0edf9;border-radius:9px;gap:3px;justify-self:start}.toggle button{border:0;border-radius:7px;background:transparent;color:#6e6187;padding:8px 11px;font-size:12px;font-weight:750}.toggle button.active{background:var(--violet);color:white}
@@ -204,17 +210,46 @@ function renderSpotlight(){
  if(t){const p=t.price_estimate,[cls,label]=budgetTag(p);
   $('top-price').innerHTML=`<span>${esc(priceText(p))}</span><span class="pill ${cls}">${esc(label)}</span>`;
   $('main-reason').textContent=(t.reasons||[]).slice(0,2).join(' · ')||t.description;
-  $('top-source').innerHTML=p?.source_url?`Price checked ${esc(dateText(p.checked_at))} · <a href="${url(p.source_url)}" target="_blank" rel="noopener noreferrer">vendor source ↗</a>`:'Confirm pricing on the vendor site before buying.';
+   $('top-source').innerHTML=(t.status==='vetted'?'Curated catalog listing':'Unreviewed listing') +
+     ' · Privacy and security not assessed · ' +
+     (p?.source_url && url(p.source_url)!=='#' ? 'Pricing reference: <a href="' +
+       esc(url(p.source_url)) + '" target="_blank" rel="noopener noreferrer">vendor source ↗</a>' +
+       (p.checked_at ? ' (checked ' + esc(dateText(p.checked_at)) + ')' : '') :
+       'Confirm current pricing before buying.');
  }
  const blockers=report.readiness?.blockers||[];
  $('top-warning').hidden=!blockers.length;$('top-warning').textContent=blockers.length?'Before you start: '+blockers[0]:'';
 }
+function trustBlock(t) {
+ const p=t.price_estimate, e=t.review_evidence||{};
+ const vendor=url(t.site), pricing=url(p?.source_url||t.pricing_source_url);
+ const reviewSearch=url(e.search_url);
+ const link=(href,label)=>href==='#'?'':'<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>';
+ const reviewed=t.status==='vetted';
+ const date=p?.checked_at||t.pricing_checked_at||'';
+ return '<details class="source-check"><summary>Trust &amp; sources <span class="tag '+
+   (reviewed?'ok':'unknown')+'">'+(reviewed?'Reviewed listing':'Not reviewed')+'</span></summary>'+
+   '<div class="source-check-body">'+
+   '<p><b>Vendor website:</b> '+(vendor==='#'?'No vendor link recorded':link(vendor,'Visit vendor site'))+'</p>'+
+   '<p><b>Pricing:</b> '+(pricing==='#'?'No pricing source recorded':link(pricing,'View pricing source')+
+     (date?' · Checked '+esc(dateText(date)):'')+(p?'':' · Plan price unconfirmed'))+'</p>'+
+   '<p><b>Independent reviews:</b> Not assessed'+(reviewSearch==='#'?'.':' · '+link(reviewSearch,'Search G2'))+'</p>'+
+   '<p><b>Privacy &amp; security:</b> Not independently assessed.</p>'+
+   '<p class="source-caution">A catalog review or source link is not a safety certification. Check privacy, data handling and terms before sharing customer data.</p>'+
+   '</div></details>';
+}
 function renderTools(){
  const tools=report.tools||[];
- $('tool-options').innerHTML=tools.map((t,i)=>{const p=t.price_estimate,[cls,label]=budgetTag(p),e=t.review_evidence||{};
-  return `<details class="tool-row" ${i===1?'open':''}><summary><b>${esc(t.name)}</b><span class="tag">${i===0?'Best fit':'Alternative'}</span><span class="tag ${cls}">${esc(label)}</span><span class="meta">${esc(priceText(p))}</span></summary>
-  <div class="tool-detail"><p>${esc(t.description)}</p>${(t.reasons||[]).length?`<p><b>Why:</b> ${(t.reasons||[]).map(esc).join(' · ')}</p>`:''}
-  <p><a href="${url(t.site)}" target="_blank" rel="noopener noreferrer">Official product page ↗</a> · <a href="${url(e.search_url||'https://www.g2.com/')}" target="_blank" rel="noopener noreferrer">Customer reviews on G2 ↗</a>${p?.source_url?` · <a href="${url(p.source_url)}" target="_blank" rel="noopener noreferrer">Pricing source ↗</a>`:''}</p></div></details>`}).join('');
+ $('tool-options').innerHTML=tools.map((t,i)=>{
+   const p=t.price_estimate,[cls,label]=budgetTag(p);
+   return '<details class="tool-row" '+(i===1?'open':'')+'><summary><b>'+esc(t.name)+
+     '</b><span class="tag">'+(i===0?'Best fit':'Alternative')+'</span><span class="tag '+cls+'">'+
+     esc(label)+'</span><span class="meta">'+esc(priceText(p))+'</span></summary>'+
+     '<div class="tool-detail"><p>'+esc(t.description)+'</p>'+
+     ((t.reasons||[]).length?'<p><b>Why:</b> '+(t.reasons||[]).map(esc).join(' · ')+'</p>':'')+
+     (url(t.site)==='#'?'':'<p><a href="'+esc(url(t.site))+'" target="_blank" rel="noopener noreferrer">Visit vendor site ↗</a></p>')+
+     trustBlock(t)+'</div></details>';
+ }).join('');
 }
 function renderReadiness(){
  const a=report.readiness||{score:0,status:'',blockers:[],next_steps:[],unanswered:[]};
