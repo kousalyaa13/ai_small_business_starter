@@ -77,6 +77,7 @@ MINE_INSTRUCTIONS = """You read a comparison or "best tools" article and list th
 Rules:
 - Only use the article text. Never add products from outside knowledge.
 - List each product at most once, using its name exactly as written in the article.
+- List at most 15 products, in the order the article presents them.
 - best_for: the article's own short note on what the product is best for, or "" if none.
 - url: the product's own website if it appears in the article's links or text, else null.
 - Skip products that do not fulfil the "Need" described below, and skip the article publisher's
@@ -154,7 +155,11 @@ class TinyFishFetcher:
         self.api_key, self.session = api_key, session or requests.Session()
         self.timeout, self.per_url_timeout_ms = timeout, per_url_timeout_ms
 
-    def fetch(self, url, allowed_domains=None):
+    def fetch_quick(self, url):
+        """For optional pages (e.g. /pricing): give up after a few seconds instead of half a minute."""
+        return self.fetch(url, per_url_timeout_ms=8000, timeout=12)
+
+    def fetch(self, url, allowed_domains=None, per_url_timeout_ms=None, timeout=None):
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
             raise FetchError("Only standard HTTPS links can be fetched.")
@@ -162,10 +167,10 @@ class TinyFishFetcher:
                 parsed.hostname == d or parsed.hostname.endswith("." + d) for d in allowed_domains):
             raise FetchError("This domain is not on the approved list.")
         try:
-            resp = self.session.post(self.endpoint, timeout=self.timeout,
+            resp = self.session.post(self.endpoint, timeout=timeout or self.timeout,
                                      headers={"X-API-Key": self.api_key, "Content-Type": "application/json"},
                                      json={"urls": [url], "format": "markdown", "links": True,
-                                           "per_url_timeout_ms": self.per_url_timeout_ms,
+                                           "per_url_timeout_ms": per_url_timeout_ms or self.per_url_timeout_ms,
                                            "purpose": "Read a software vendor's product and pricing page"})
         except requests.RequestException:
             raise FetchError("The page reader service couldn't be reached.")
@@ -212,7 +217,7 @@ ARTICLE_PATH = re.compile(
 LISTICLE_TITLE = re.compile(r"\b(best|top \d+|\d+ (best|top)|alternatives|vs\.?|versus|compared|comparison|review(s|ed)?)\b", re.I)
 GENERIC_NAME_WORDS = {"ai", "the", "app", "apps", "inc", "llc", "io", "hq", "voice", "agent", "agents", "receptionist",
                       "answering", "service", "services", "software", "platform", "phone", "call", "calls"}
-BRAND_PREFIXES = ("get", "try", "use", "join", "hey", "go")
+BRAND_PREFIXES = ("get", "try", "use", "join", "hey", "go", "explore")
 
 
 def looks_like_article(url):
@@ -297,11 +302,19 @@ def base_host(url):
     return host[4:] if host.startswith("www.") else host
 
 
+def core_tool_key(name):
+    """'Tock', 'Tock (by Squarespace)' and 'TOCK' are the same tool when no site is known yet."""
+    return re.sub(r"[^a-z0-9]", "", clean_tool_name(name).lower())
+
+
+MINE_TEXT_CHARS = int(os.environ.get("AGENT_MINE_TEXT_CHARS", 12000))
+
+
 @dataclass
 class Lead:
     """A vendor site worth checking, from search results or from comparison articles."""
     url: str
-    host: str
+    host: str | None
     name: str = ""
     best_for: str = ""
     mentions: int = 0
@@ -364,7 +377,7 @@ class Researcher:
         self.store.cache_put(self.meter.run_id, "search", query, [r.__dict__ for r in results])
         return results
 
-    def _page(self, url):
+    def _page(self, url, quick=False):
         cached = self.store.cache_get(self.meter.run_id, "page", url)
         if cached is not None:
             if "error" in cached:
@@ -375,7 +388,8 @@ class Researcher:
         try:
             started = time.monotonic()
             try:
-                page = self.fetcher.fetch(url)
+                quick_fetch = getattr(self.fetcher, "fetch_quick", None) if quick else None
+                page = quick_fetch(url) if quick_fetch else self.fetcher.fetch(url)
             finally:
                 log.info('research fetch duration_seconds=%.2f host=%s', time.monotonic() - started, base_host(url))
         except FetchError as exc:
@@ -408,7 +422,18 @@ class Researcher:
             # Pick the best articles from all queries, not just the first ones returned.
             ranked = sorted(found_articles.values(), key=article_score, reverse=True)
             articles = [r.url for r in ranked if article_score(r) >= 2][: self.max_articles]
+            unresolved: dict[str, Lead] = {}  # tools an article named without linking their site
             for lead in self._mine_articles(component, articles, notes):
+                if lead.host is None:
+                    match = next((h for h in leads if name_matches_host(lead.name, h)), None)
+                    if match is None:
+                        key = core_tool_key(lead.name)
+                        if key in unresolved:
+                            unresolved[key].mentions += lead.mentions
+                        else:
+                            unresolved[key] = lead
+                        continue
+                    lead.host = match
                 if lead.host in exclude_hosts:
                     continue  # already shown to the customer
                 if lead.host in leads:
@@ -416,13 +441,16 @@ class Researcher:
                     leads[lead.host].best_for = leads[lead.host].best_for or lead.best_for
                 else:
                     leads[lead.host] = lead
+            # Look up homepages only for the tools that will actually be checked (top N), in parallel.
+            batch = self._top_leads(list(leads.values()) + list(unresolved.values()), exclude_hosts)
         except requests.RequestException:
             notes.append(f"Web search for '{label}' failed; try again later.")
+            batch = sorted(leads.values(), key=lambda l: -l.mentions)[: self.candidates_per_component]
         except BudgetExceeded as exc:
             notes.append(f"Research for '{label}' stopped early: {exc}.")
+            batch = sorted(leads.values(), key=lambda l: -l.mentions)[: self.candidates_per_component]
         # Tools recommended by several articles first; each check is independent, so run them in parallel.
-        ranked = sorted(leads.values(), key=lambda l: -l.mentions)
-        candidates = self._evaluate_all(component, intake, ranked[: self.candidates_per_component], notes, label)
+        candidates = self._evaluate_all(component, intake, batch, notes, label)
         candidates.sort(key=lambda c: (COMPLEXITY_ORDER.get(c.setup_complexity, 2), -c.mentions))
         if not candidates:
             notes.append(f"No tool with verifiable evidence was found on the web for '{label}'.")
@@ -449,43 +477,91 @@ class Researcher:
                     candidates.append(candidate)
         return candidates
 
-    def _mine_articles(self, component, article_urls, notes) -> list[Lead]:
-        """Read comparison articles and turn the products they recommend into leads."""
-        found: dict[str, Lead] = {}
-        for url in article_urls:
-            try:
-                page = self._page(url)
-            except FetchError:
-                continue
-            article_host = base_host(page["url"])
-            link_hosts = {}
-            for link in page.get("links", []):
-                h = base_host(link)
-                if h and h != article_host and not self._skippable(h):
-                    link_hosts.setdefault(h, link)
-            content = (f"Need: {component.description}\nArticle title: {page['title']}\n"
-                       f"Websites linked from the article: {', '.join(sorted(link_hosts)[:150])}\n"
-                       f"Article text: {page['text'][:12000]}")
-            mined: ArticleTools = self.meter.model_call(self.model, "mine", MINE_INSTRUCTIONS, content, ArticleTools)
-            for tool in mined.tools[:15]:
-                if not quote_on_page(tool.name, page["text"]):
-                    continue  # the article must actually name the product
-                tool.name = clean_tool_name(tool.name)
-                if name_matches_host(tool.name, article_host):
-                    continue  # a vendor listing itself in its own article is not a recommendation
-                host = self._resolve_host(tool, link_hosts)
-                if not host or self._skippable(host) or host == article_host:
+    def _top_leads(self, ranked_pool, exclude_hosts) -> list[Lead]:
+        """Pick the top N leads by recommendations; find homepages for unlinked ones only as needed."""
+        pool = sorted(ranked_pool, key=lambda l: -l.mentions)  # stable: search results keep their order on ties
+        chosen: dict[str, Lead] = {}
+        while pool and len(chosen) < self.candidates_per_component:
+            take = pool[: self.candidates_per_component - len(chosen)]
+            pool = pool[len(take):]
+            missing = [l for l in take if l.host is None]
+            with ThreadPoolExecutor(max_workers=max(1, len(missing))) as ex:
+                hosts = dict(zip(map(id, missing), ex.map(self._host_from_search, missing)))
+            for lead in take:
+                if lead.host is None:
+                    lead.host = hosts.get(id(lead))
+                    if not lead.host or self._skippable(lead.host):
+                        continue  # no homepage found; the next lead takes its place
+                    lead.url = f"https://{lead.host}/"
+                if lead.host in exclude_hosts:
                     continue
-                url = link_hosts.get(host) or (tool.url if tool.url and base_host(tool.url) == host else f"https://{host}/")
-                lead = found.setdefault(host, Lead(url=url, host=host, name=tool.name))
-                lead.mentions += 1
-                lead.best_for = lead.best_for or tool.best_for[:120]
+                if lead.host in chosen:
+                    chosen[lead.host].mentions += lead.mentions
+                else:
+                    chosen[lead.host] = lead
+        return list(chosen.values())[: self.candidates_per_component]
+
+    def _mine_articles(self, component, article_urls, notes) -> list[Lead]:
+        """Read comparison articles (in parallel) and turn the products they recommend into leads.
+
+        Leads whose site the article links get a host now; the rest get one later, only if they rank
+        among the tools that will be checked. Results are merged in article order, so the outcome
+        doesn't depend on which article finishes first."""
+        if not article_urls:
+            return []
+        with ThreadPoolExecutor(max_workers=len(article_urls)) as pool:
+            per_article = list(pool.map(lambda url: self._mine_one(component, url), article_urls))
+        found: dict[str, Lead] = {}
+        for leads in per_article:
+            for lead in leads:
+                key = lead.host or "name:" + core_tool_key(lead.name)
+                if key in found:
+                    found[key].mentions += 1
+                    found[key].best_for = found[key].best_for or lead.best_for
+                else:
+                    found[key] = lead
         if found:
             notes.append(f"Found {len(found)} tool(s) recommended in {len(article_urls)} comparison article(s).")
         return list(found.values())
 
-    def _resolve_host(self, tool, link_hosts):
-        """The product's own domain: a linked site whose name matches, else a quick search."""
+    def _mine_one(self, component, url) -> list[Lead]:
+        try:
+            page = self._page(url)
+        except FetchError:
+            return []
+        article_host = base_host(page["url"])
+        link_hosts = {}
+        for link in page.get("links", []):
+            h = base_host(link)
+            if h and h != article_host and not self._skippable(h):
+                link_hosts.setdefault(h, link)
+        content = (f"Need: {component.description}\nArticle title: {page['title']}\n"
+                   f"Websites linked from the article: {', '.join(sorted(link_hosts)[:150])}\n"
+                   f"Article text: {page['text'][:MINE_TEXT_CHARS]}")
+        try:
+            mined: ArticleTools = self.meter.model_call(self.model, "mine", MINE_INSTRUCTIONS, content, ArticleTools)
+        except BudgetExceeded:
+            return []
+        leads, seen = [], set()
+        for tool in mined.tools[:15]:
+            if not quote_on_page(tool.name, page["text"]):
+                continue  # the article must actually name the product
+            tool.name = clean_tool_name(tool.name)
+            if name_matches_host(tool.name, article_host):
+                continue  # a vendor listing itself in its own article is not a recommendation
+            host = self._host_from_links(tool, link_hosts)
+            if host and (self._skippable(host) or host == article_host):
+                continue
+            key = host or core_tool_key(tool.name)
+            if key in seen:
+                continue
+            seen.add(key)
+            url = (link_hosts.get(host) or (tool.url if tool.url and base_host(tool.url) == host else f"https://{host}/")) if host else ""
+            leads.append(Lead(url=url, host=host, name=tool.name, best_for=tool.best_for[:120], mentions=1))
+        return leads
+
+    def _host_from_links(self, tool, link_hosts):
+        """The product's own domain from the article's own links (no search needed)."""
         if tool.url:
             h = base_host(tool.url)
             if h in link_hosts or name_matches_host(tool.name, h):
@@ -493,14 +569,20 @@ class Researcher:
         for h in link_hosts:
             if name_matches_host(tool.name, h):
                 return h
-        try:
-            for result in self._search(f"{tool.name} official site"):
-                h = base_host(result.url)
-                if not looks_like_listicle(result) and not self._skippable(h) and name_matches_host(tool.name, h):
-                    return h
-        except (BudgetExceeded, requests.RequestException):
-            pass
         return None
+
+    def _host_from_search(self, lead):
+        """The product's own domain via a quick search, for tools the article didn't link."""
+        try:
+            hosts = [base_host(r.url) for r in self._search(f"{lead.name} official site")
+                     if not looks_like_listicle(r) and not self._skippable(base_host(r.url))]
+        except (BudgetExceeded, requests.RequestException):
+            return None
+        matches = [h for h in hosts if name_matches_host(lead.name, h)]
+        # Prefer the exact brand (Tock -> exploretock.com) over a longer one that merely starts with it (tockos.org).
+        compact = re.sub(r"[^a-z0-9]", "", lead.name.lower())
+        exact = [h for h in matches if brand_of(h).replace("-", "") == compact]
+        return (exact or matches or [None])[0]
 
     def _evaluate(self, component, intake, lead):
         host = lead.host
@@ -512,7 +594,7 @@ class Researcher:
         pricing_url = f"https://{urlparse(page['url']).hostname}/pricing"
         if pricing_url.rstrip("/") != page["url"].rstrip("/"):
             try:
-                pages.append(self._page(pricing_url))
+                pages.append(self._page(pricing_url, quick=True))  # a bonus page: don't wait long for it
             except FetchError:
                 pass
         text = " ".join(p["text"] for p in pages)

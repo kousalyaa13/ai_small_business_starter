@@ -101,6 +101,17 @@ class TinyFishClientTests(unittest.TestCase):
         self.assertIn("Starter plan: $12/month", page.text)
         self.assertEqual(session.calls[0][2]["json"]["urls"], ["https://leadforms.example/pricing"])
 
+    def test_quick_fetch_gives_up_sooner(self):
+        from agent.research import TinyFishFetcher
+        session = self.Session(self.Resp(200, {"results": [
+            {"url": "https://leadforms.example/pricing", "title": "Pricing", "text": "Starter: $12/month"}], "errors": []}))
+        fetcher = TinyFishFetcher("tf-key", session=session)
+        fetcher.fetch_quick("https://leadforms.example/pricing")
+        fetcher.fetch("https://leadforms.example/")
+        (_, _, quick), (_, _, normal) = session.calls
+        self.assertLess(quick["json"]["per_url_timeout_ms"], normal["json"]["per_url_timeout_ms"])
+        self.assertLess(quick["timeout"], normal["timeout"])
+
     def test_fetch_errors_become_fetch_errors(self):
         from agent.research import TinyFishFetcher
         blocked = self.Session(self.Resp(200, {"results": [], "errors": [{"url": "u", "error": "bot_blocked"}]}))
@@ -331,6 +342,59 @@ class ResearchTests(unittest.TestCase):
         self.assertTrue(any("Bigcorp" in n and "not small businesses" in n for n in notes))
         self.assertNotIn("https://reviewsite.example/about", fetcher.calls)
 
+    def test_articles_are_mined_in_parallel_but_merged_in_article_order(self):
+        import threading, time
+        from agent.research import Lead
+        researcher, _, _ = self.researcher(StubModel())
+        started, both = [], threading.Event()
+
+        def mine_one(component, url):
+            started.append(url)
+            if len(started) == 2:
+                both.set()
+            both.wait(2)  # both articles are being read at the same time
+            time.sleep(0.05 if url.endswith("first") else 0)  # the first article finishes last
+            shared = Lead(url="https://shared.example/", host="shared.example", name="Shared", best_for="", mentions=1)
+            only = Lead(url="", host=None, name="Only " + url[-5:], best_for="", mentions=1)
+            return [shared, only]
+        researcher._mine_one = mine_one
+        leads = researcher._mine_articles(self.component, ["https://a.example/first", "https://b.example/later"], [])
+        self.assertTrue(both.is_set())
+        self.assertEqual([l.name for l in leads], ["Shared", "Only first", "Only later"])
+        self.assertEqual(leads[0].mentions, 2)
+
+    def test_homepages_are_looked_up_only_for_tools_that_will_be_checked(self):
+        from agent.research import Lead
+        researcher, _, _ = self.researcher(StubModel())
+        researcher.candidates_per_component = 2
+        looked_up = []
+
+        def host_from_search(lead):
+            looked_up.append(lead.name)
+            return {"Gamma": "gamma.example", "Delta": "delta.example"}.get(lead.name)
+        researcher._host_from_search = host_from_search
+        pool = [Lead("https://alpha.example/", "alpha.example", "Alpha", "", 3),
+                Lead("", None, "Beta", "", 2),     # no homepage found: the next tool takes its place
+                Lead("", None, "Gamma", "", 1),
+                Lead("", None, "Delta", "", 1)]
+        chosen = researcher._top_leads(pool, frozenset())
+        self.assertEqual([(l.name, l.host) for l in chosen], [("Alpha", "alpha.example"), ("Gamma", "gamma.example")])
+        self.assertEqual(chosen[1].url, "https://gamma.example/")
+        self.assertEqual(looked_up, ["Beta", "Gamma"])  # Delta never needed a search
+
+    def test_homepage_lookup_prefers_the_exact_brand(self):
+        from agent.research import Lead
+        researcher, search, _ = self.researcher(StubModel(), results=[
+            SearchResult("Tock OS", "https://tockos.org/", ""), SearchResult("Tock", "https://www.exploretock.com/", "")])
+        self.assertEqual(researcher._host_from_search(Lead("", None, "Tock", "", 1)), "exploretock.com")
+
+    def test_pricing_page_uses_a_quick_fetch(self):
+        researcher, _, fetcher = self.researcher(StubModel())
+        quick = []
+        fetcher.fetch_quick = lambda url: (quick.append(url), fetcher.fetch(url))[1]
+        researcher.research(self.component, Intake(problem_text=EXAMPLE))
+        self.assertEqual(quick, ["https://leadforms.example/pricing"])
+
     def test_queries_come_from_the_breakdown(self):
         researcher, _, _ = self.researcher(StubModel())
         part = Component(id="c1", capability="other", description="Answer calls", constraints=[], connects=[],
@@ -407,6 +471,7 @@ class ResearchTests(unittest.TestCase):
         self.assertTrue(name_matches_host("Weave", "getweave.com"))
         self.assertFalse(name_matches_host("Carly AI", "ai-tools.com"))
         self.assertFalse(name_matches_host("Goodcall", "callrail.com"))
+        self.assertTrue(name_matches_host("Tock", "exploretock.com"))
 
     def test_old_saved_entries_without_audience_check_are_not_reused(self):
         researcher, _, _ = self.researcher(StubModel())
