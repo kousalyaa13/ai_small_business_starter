@@ -47,8 +47,10 @@ class ConsultationLayoutTests(unittest.TestCase):
         self.assertIn("/selection", js)           # prices come from the server
         self.assertIn("trackScroll", js)          # carousel position survives redraws
         self.assertIn("plain_note", js)           # owners see one plain line per need, not working notes
-        self.assertIn("TOP_TOOLS = 5", js)        # top 5 tools per need, with "Show all"
-        self.assertIn("Show all ", js)
+        # Show only the top five matching tools, without an expand-all toggle.
+        self.assertIn("TOP_TOOLS = 5", js)
+        self.assertIn("all.slice(0, TOP_TOOLS)", js)
+        self.assertNotIn("Show all ", js)
         self.assertIn("groupTools", js)
         self.assertNotIn("compareTable", js)
         # A search keeps the owner in control and reports what it found.

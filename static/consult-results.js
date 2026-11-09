@@ -77,6 +77,7 @@
 
   const needs = () => data?.components || [];
   const needById = id => needs().find(c => c.id === id);
+  const TOP_TOOLS = 5;
   const toolsOf = need => need?.tools || [];
   const isConnector = n => n.capability === 'workflow_automation' && (n.connects || []).length >= 2;
   const nativeTool = n => {
@@ -252,8 +253,8 @@
       }
       return isNew(b) - isNew(a);
     });
-    // Show every matching tool; horizontal comparison handles navigation.
-    const tools = all;
+    // Keep the comparison focused on the five highest-ranked tools for the chosen sort.
+    const tools = all.slice(0, TOP_TOOLS);
     const share = suggestion && suggestion.from === need.id ? '<div class="share-suggest">' + escape(suggestion.name) +
       ' also covers ' + escape(suggestion.needs.map(id => needById(id)?.description).join(', ')) + '. ' +
       '<button type="button" class="research-btn" data-share="yes">Use ' + escape(suggestion.name) + ' there too</button>' +
