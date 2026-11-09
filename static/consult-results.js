@@ -86,7 +86,6 @@
     return toolsOf(needById(n.connects[0])).find(t => t.tool_id === chosen[0]) || null;
   };
   const picksKey = () => 'bloom-picks:' + projectId;  // per project: a search's new plan version keeps your picks
-  const savedKey = () => 'bloom-saved-plan:' + projectId;
   const searchKey = () => 'bloom-search:' + projectId;
   const seenKey = () => 'bloom-seen-tools:' + projectId;
   const readJSON = (key, fallback) => { try { return JSON.parse(sessionStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
@@ -106,8 +105,7 @@
   function loadPicks(plan) {
     if (picksPlan === plan.id) return;
     picksPlan = plan.id;
-    const saved = (() => { try { return JSON.parse(localStorage.getItem(savedKey())); } catch { return null; } })();
-    const base = readJSON(picksKey(), null) || (saved?.planId === plan.id ? saved.selections : null) || picksFromOption((plan.options || [])[0]);
+    const base = readJSON(picksKey(), null) || picksFromOption((plan.options || [])[0]);
     picks = {};
     for (const [id, choice] of Object.entries(base)) {
       const need = needById(id);
@@ -350,21 +348,14 @@
     const totalText = !o ? 'Calculating…' : o.total_is_complete ?
       money(o.monthly_total) + '/month' : money(knownSubtotal) + '/month known';
     const unknownNote = o && !o.total_is_complete ? 'Estimated subtotal only — tools without verified prices are excluded.' : '';
-    const saved = (() => {
-      try { return JSON.parse(localStorage.getItem(savedKey())); }
-      catch { return null; }
-    })();
-    const isSaved = !!saved && saved.planId === data?.plan?.id &&
-      String(saved.planVersion) === String(data?.plan?.version) &&
-      JSON.stringify(saved.selections) === JSON.stringify(picks);
     const quick = '';
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(isSaved ? 'Plan saved in this browser. ' + (unknownNote || '') : (unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message))) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
+      escape(unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message)) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
       (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
       '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
-      '>' + (isSaved ? 'Saved ✓' : 'Save this plan →') + '</button></div>' : '') + '</div>';
+      '>' + 'Download plan PDF ↗' + '</button></div>' : '') + '</div>';
   }
 
   const researchingNames = () => [...researching].map(id => needById(id)?.description || 'this need').join('”, “');
@@ -455,23 +446,86 @@
   async function saveSelection() {
     const button = byId('save-selection');
     if (!button || !preview) return;
+    // Open synchronously to avoid pop-up blockers during PDF library loading.
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      const msg = byId('selection-message');
+      if (msg) msg.textContent = 'Please allow pop-ups to open your PDF.';
+      return;
+    }
+    tab.document.title = 'Preparing BloomBots Decision Passport';
+    tab.document.body.innerHTML = '<p style="font:18px system-ui;padding:24px">Preparing your Decision Passport PDF…</p>';
     button.disabled = true;
-    const record = {
-      planId: data.plan.id, planVersion: data.plan.version,
-      savedAt: new Date().toISOString(), selections: {...picks},
-      monthlyKnown: preview.monthly_total,
-      totalIsComplete: !!preview.total_is_complete,
-      assignments: preview.assignments.map(a => ({
-        need: a.description, tool: a.tool_name, plan: a.plan_name,
-        monthlyCost: a.monthly_cost, website: a.site_url || null
-      }))
-    };
     try {
-      localStorage.setItem(savedKey(), JSON.stringify(record));
-      drawSummary();
+      const jsPDF = await new Promise((resolve, reject) => {
+        if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+        script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(Error('PDF library unavailable'));
+        script.onerror = () => reject(Error('PDF library unavailable'));
+        document.head.appendChild(script);
+      });
+      const pdf = new jsPDF({unit:'mm',format:'a4'});
+      const purple = [113,65,190], ink = [48,38,65], muted = [102,91,115];
+      let y = 22;
+      const pageWidth = 210, margin = 18, maxWidth = pageWidth - margin*2;
+      function write(value, size=10, bold=false, color=ink, indent=0) {
+        pdf.setFont('helvetica',bold?'bold':'normal');
+        pdf.setFontSize(size); pdf.setTextColor(...color);
+        const lines = pdf.splitTextToSize(String(value ?? '—'), maxWidth-indent);
+        const lineHeight = size*0.48;
+        if (y + lines.length*lineHeight > 270) { pdf.addPage(); y=20; }
+        pdf.text(lines,margin+indent,y);
+        y += lines.length*lineHeight + 3;
+      }
+      function heading(value) { y+=4; write(value,13,true,purple); }
+      pdf.setFillColor(249,245,254); pdf.rect(0,0,210,42,'F');
+      write('BloomBots  |  Decision Passport',20,true,purple);
+      write('Your selected business tools and next steps',10,false,muted);
+      y=49;
+      const intake = data?.intake || {};
+      const budget = intake.monthly_budget;
+      if (budget != null && budget !== '') write('Monthly budget: $'+Number(budget).toFixed(2),10,true);
+      const assignments = preview.assignments || [];
+      const unique = new Map();
+      for (const a of assignments) {
+        const key = a.tool_id || a.tool_name || a.description;
+        if (!unique.has(key)) unique.set(key,a);
+      }
+      const known = [...unique.values()].filter(a=>a.monthly_cost != null).reduce((sum,a)=>sum+Number(a.monthly_cost),0);
+      const hasUnknown = [...unique.values()].some(a=>a.monthly_cost == null && !['skipped','existing','native','none'].includes(a.source));
+      write('Known monthly subtotal: $'+known.toFixed(2)+(hasUnknown?' (excludes unverified prices)':''),11,true);
+      heading('Your business needs and selected tools');
+      for (const a of assignments) {
+        write(a.description || 'Business need',10,true);
+        write('Selected: '+(a.tool_name || (a.source==='skipped'?'Skipped':a.source==='existing'?'Already handled':'Not selected'))+
+          (a.plan_name?' · '+a.plan_name:'')+
+          (a.monthly_cost != null?' · $'+Number(a.monthly_cost).toFixed(2)+'/month':' · Price to verify'),9,false,muted,3);
+        if (a.site_url) write('Website: '+a.site_url,8,false,purple,3);
+      }
+      heading('Next steps checklist');
+      const steps = [
+        'Confirm current pricing, billing terms, and any extra fees on vendor websites.',
+        'Verify that each selected plan supports your required features and team size.',
+        'Check integrations and data-sharing requirements between selected tools.',
+        'Test the tools with a small pilot before committing to paid subscriptions.',
+        'Review the results and decide whether to proceed.'
+      ];
+      for (const step of steps) {
+        if (y>264) {pdf.addPage();y=20;}
+        pdf.setDrawColor(...purple);pdf.rect(margin,y-3,3.5,3.5);
+        write(step,9,false,ink,7);
+      }
+      y+=4;write('Estimates are based on available vendor details. BloomBots does not purchase or install software.',8,false,muted);
+      const pages=pdf.getNumberOfPages();
+      for(let p=1;p<=pages;p++){pdf.setPage(p);pdf.setFontSize(8);pdf.setTextColor(...muted);pdf.text('BloomBots Decision Passport',margin,286);pdf.text(p+' / '+pages,192,286,{align:'right'});}
+      const url = URL.createObjectURL(pdf.output('blob'));
+      tab.location.replace(url);
+      // The new tab owns the blob URL for this browsing session.
     } catch (err) {
-      const message = byId('selection-message');
-      if (message) message.textContent = 'Could not save in this browser. Check that site storage is enabled.';
+      tab.document.body.innerHTML = '<p style="font:16px system-ui;padding:24px">Unable to create the PDF. Please return to BloomBots and try again.</p>';
+      console.error('Decision Passport PDF error',err);
+    } finally {
       button.disabled = false;
     }
   }
