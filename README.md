@@ -1,6 +1,13 @@
-# BloomBot AI — one-page small business decision dashboard
+# BloomBot AI — software advice for small businesses
 
 A hackathon proof of concept that helps small-business owners evaluate whether they need AI, compare a few suitable options, preview a workflow, and plan a limited pilot.
+
+| Route | What it is |
+|---|---|
+| `/` | Public landing page (see `LANDING_PAGE.md`) |
+| `/solutions` | What the product does and how sources are checked |
+| `/dashboard` | One short questionnaire, one decision dashboard (below) |
+| `/consult` | Consultation agent: describe a problem, get researched tools per need, pick them, get a setup guide |
 
 ## What owners actually see
 
@@ -28,7 +35,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Browse to http://127.0.0.1:5050 (set `PORT` to change it; macOS reserves port 5000 for AirPlay Receiver, which returns "403 Access denied"). The default route uses `templates/dashboard.html`. This one file contains the dashboard HTML, CSS, and vanilla JavaScript to make hackathon editing straightforward.
+Browse to http://127.0.0.1:5050 (set `PORT` to change it; macOS reserves port 5000 for AirPlay Receiver, which returns "403 Access denied"). The dashboard (`/dashboard`) uses `templates/dashboard.html`. This one file contains the dashboard HTML, CSS, and vanilla JavaScript to make hackathon editing straightforward.
 
 ## Test
 
@@ -48,11 +55,23 @@ Describe a business problem in plain English. The agent:
 
 1. **Breaks it into components.** Each component gets one capability tag from a fixed list (`agent/capabilities.py`). Examples: `form_capture`, `crm_contacts`, `workflow_automation`.
 2. **Checks the in-house catalog first.** `data/tools.json` lists vetted tools with capabilities and plan prices, each recorded with its source URL and the date checked.
-3. **Searches the web for gaps.** The breakdown step writes a plain search query per part (e.g. "AI receptionist for plumbers"). Research reads up to 4 independent comparison articles to collect the tools they recommend (a vendor's mention of itself doesn't count), checks each tool's own site for price, audience and setup difficulty, and drops tools aimed at enterprises or other industries. It uses TinyFish (or Brave) to search, then reads vendor pages through TinyFish's browser-based fetch or an SSRF-guarded direct fetcher. A model extracts facts, and code keeps only those whose quoted evidence appears on the page. Web finds are always labelled *not vetted* and are saved to the `discovered_tools` table. A later request for the same need reuses them instead of searching again, and rediscovering a tool refreshes its prices. Needs outside the fixed capability list (such as answering phone calls) are matched by their wording. Entries older than 30 days are researched again.
-4. **Builds two or three options.** Monthly costs are calculated in code from the plans and your usage. A tool covering several parts is counted once, and unknown prices are never guessed.
-5. **Pauses for your approval.** The LangGraph run is checkpointed in SQLite, so it survives restarts. Approvals are idempotent: repeating a request returns the same record.
+3. **Rates fit, then searches the web for gaps.** Every known tool is rated for each need and business type as "Built for this", "Works, with limits" or "Not designed for this". A need is researched only if fewer than 2 known tools are built for it. The breakdown step writes a plain search query per part (e.g. "AI receptionist for plumbers"). Research reads up to 4 independent comparison articles to collect the tools they recommend (a vendor's mention of itself doesn't count), checks each tool's own site for price, audience and setup difficulty, and drops tools aimed at enterprises or other industries. It uses TinyFish (or Brave) to search, then reads vendor pages through TinyFish's browser-based fetch or an SSRF-guarded direct fetcher. A model extracts facts, and code keeps only those whose quoted evidence appears on the page. Web finds are always labelled *not vetted* and are saved to the `discovered_tools` table. A later request for the same need reuses them instead of searching again, and rediscovering a tool refreshes its prices. Needs outside the fixed capability list (such as answering phone calls) are matched by their wording. Entries older than 30 days are researched again.
+4. **Shows the top 5 tools per need.** Monthly costs are calculated in code from the plans and your usage. A tool covering several parts is counted once, and unknown prices are never guessed. The owner picks one tool per need, or marks it "I already have this" or "Skip". As picks change, the page prices the selection and checks whether the picked tools can exchange data (native integration, Zapier, or by hand).
+5. **Builds a setup plan.** Once every need has a choice, **Build my setup guide** saves the selection (the LangGraph run is checkpointed in SQLite, so it survives restarts; approvals are idempotent). The setup plan shows how the tools connect (when each connection runs, what data moves and how) and one ordered step-by-step guide across all tools, with checkboxes saved per project. Plans with unconfirmed prices can still be saved; the guide adds a step to confirm the price with the vendor. The plan and guide can be downloaded as a PDF.
 
-Nothing is purchased, connected or deployed in this milestone.
+Nothing is purchased, connected or configured for the owner; the guide tells them how to do it.
+
+### Research speed
+
+Measured on one need ("restaurant reservation system"), research takes about 45–60 s, down from about 100 s:
+
+- Needs are researched in parallel (up to 3 at a time, `AGENT_RESEARCH_WORKERS`).
+- The 4 comparison articles are read and mined in parallel; results are merged in article order, so the outcome doesn't depend on which finishes first.
+- Homepages are looked up by search only for the top 5 tools that will actually be checked, not for every tool an article names. The lookup prefers the exact brand (Tock → exploretock.com, not tockos.org).
+- Vendor `/pricing` pages are optional, so they get an 8 s timeout instead of 30 s.
+- Vendor pages are checked in parallel.
+
+Cheaper mining (minimal reasoning, or 8,000 instead of 12,000 characters of article text) was A/B tested on three needs and rejected: it dropped up to half of the tools the articles recommend. What remains is mostly model time (about 10–15 s per article and per vendor page, in parallel).
 
 ## Product-first consultation interface (November 2026)
 
@@ -61,6 +80,7 @@ The `/consult` results page is now designed for nontechnical business owners:
 - A compact **recommendations ready** summary replaces the seven progress chips after the run finishes. Identified tasks are available in a single optional disclosure.
 - Each recommendation is a **product-first card** with a prominent vendor name, recognizable site icon, plan, total price, billing commitment, task coverage, and **Visit website** link. Site icons are loaded from the public Google favicon service using the vendor's HTTPS domain; a letter fallback is shown if an icon is unavailable.
 - Tasks fulfilled by the **same product appear once** under that product. Included capabilities do not add duplicate charges. Bundled options show distinct products separately.
+- Each tool shows where it came from: **Reviewed listing** (from the curated catalog) or **Web-discovered**. **View evidence** shows the recorded source links. These checks confirm sources are recorded, not that a vendor is safe; the security assessment is labelled as a demo preview.
 - **Compare tools** switches to a consistent side-by-side table; the old per-task "other tool fits this part" links are removed from the customer-facing view.
 - **View details** reveals three concise tabs: Overview, Pricing details (with sources and full assumptions), and Setup & limits. Setup budget remains optional and collapsed.
 - **Adjust budget or team size** opens the existing recovery calculator only when requested, unless no viable match exists. Nothing is purchased; **Choose this tool** saves the plan selection.
@@ -123,24 +143,40 @@ Put keys in a `.env` file in the project folder (copy `.env.example`). It is git
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | Real decomposition and extraction. Without it, a deterministic keyword stub is used. |
-| `OPENROUTER_API_KEY` | Used when `OPENAI_API_KEY` is not set. Defaults: `openai/gpt-5-mini` for decomposition, `openai/gpt-5-nano` for extraction. `OPENROUTER_MODEL` sets one model for both. |
-| `AGENT_REASONING_EXTRACT`, `AGENT_REASONING_DECOMPOSE` | Reasoning effort per task (`none`, `minimal`, `low`, `medium`, `high`). Extraction defaults to `low`, which keeps vendor-page reading at a few seconds per page. |
-| `AGENT_RESEARCH_CANDIDATES`, `AGENT_MIN_GOOD_TOOLS` | Vendor sites checked per researched need (default 5), and how many known tools rated "built for this" a need needs before web research is skipped (default 2). The page shows the top 5 tools per need, with "Show all". |
+| `OPENROUTER_API_KEY` | Used when `OPENAI_API_KEY` is not set. Defaults: `openai/gpt-5-mini` for decomposition and the setup guide, `openai/gpt-5-nano` for extraction, article mining and fit ratings. `OPENROUTER_MODEL` sets one model for all; `AGENT_MODEL_<TASK>` sets one task. |
+| `AGENT_REASONING_<TASK>` | Reasoning effort per task (`none`, `minimal`, `low`, `medium`, `high`). Tasks: `decompose`, `extract` (vendor pages), `mine` (comparison articles), `fit` (fit ratings), `setup` (setup guide). Defaults: `low` for extract, mine and fit; `medium` for setup. `minimal` was tested and is faster, but missed tools and mislabelled capabilities. |
+| `AGENT_RESEARCH_CANDIDATES`, `AGENT_MIN_GOOD_TOOLS` | Vendor sites checked per researched need (default 5), and how many known tools rated "built for this" a need needs before web research is skipped (default 2). The page shows the top 5 tools per need. |
+| `AGENT_RESEARCH_WORKERS` | Needs researched at the same time (default 3, max 4). |
+| `AGENT_MINE_TEXT_CHARS` | Characters of each comparison article given to the model (default 12000; lower values lost tools in testing). |
 | *(fit ratings)* | Every tool is rated for each need and business type as "Built for this", "Works, with limits" or "Not designed for this", with a reason. Tools found online are rated while their pages are read; catalog and saved tools in one batched call per run, cached by tool, need and business type. A need counts as covered only if some tool is built for it, otherwise it is researched. "Reviewed listing" means the price and details were checked, not that the tool fits. |
 | `AGENT_DISCOVERED_MAX_AGE_DAYS` | How long a web-discovered tool is reused before it is researched again (default 30). |
 | `AGENT_PROVIDER` | Force `openai`, `openrouter` or `stub`, regardless of which keys are set. |
-| `OPENAI_MODEL`, `AGENT_MODEL_DECOMPOSE`, `AGENT_MODEL_EXTRACT` | Model per task (the last two default to `OPENAI_MODEL`). |
+| `OPENAI_MODEL`, `AGENT_MODEL_<TASK>` | Model per task (defaults to `OPENAI_MODEL`). |
 | `TINYFISH_API_KEY` | Web research via TinyFish: its Search API finds vendors, and its Fetch API reads pages in a real browser. Used before Brave when both are set. |
 | `BRAVE_API_KEY` | Alternative search provider (pages are then fetched directly). Without any search key, gaps are reported. |
 | `AGENT_MAX_SEARCHES`, `AGENT_MAX_FETCHES`, `AGENT_MAX_MODEL_CALLS`, `AGENT_MAX_RUN_TOKENS`, `AGENT_MAX_RUN_USD` | Hard per-run limits. |
 | `AGENT_PRICE_IN_PER_MTOK`, `AGENT_PRICE_CACHED_IN_PER_MTOK`, `AGENT_PRICE_OUT_PER_MTOK`, `AGENT_PRICE_PER_SEARCH` | Unit prices for spend estimates. If unset, spend is recorded as unknown and the token limit applies. |
 
-API: `POST /api/projects`, `GET /api/projects/<id>`, `POST /api/projects/<id>/answers`, `POST /api/projects/<id>/approve`, `POST /api/projects/<id>/research`.
+API:
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/projects` | Start a consultation from the problem description |
+| `GET /api/projects/<id>` | Run status, plan, picks, approval and setup plan (the page polls this) |
+| `POST /api/projects/<id>/answers` | Answer clarifying questions |
+| `POST /api/projects/<id>/research` | Find cheaper or better options (see below) |
+| `POST /api/projects/<id>/revise` | Change budget, seats or problem text and rerun |
+| `POST /api/projects/<id>/selection` | Price the owner's current picks (nothing is saved) |
+| `POST /api/projects/<id>/connections` | Check how the picked tools connect |
+| `POST /api/projects/<id>/approve` | Save the picks and start building the setup plan |
+| `POST /api/projects/<id>/setup/progress` | Tick a setup-guide step done or not done |
+| `POST /api/projects/<id>/setup/retry` | Rebuild a setup plan that failed |
+| `GET /api/projects/<id>/plan.pdf` | Download the plan and setup guide as a PDF |
 
 **Find cheaper or better options.** Parts covered by the catalog or by saved discoveries are not searched again automatically, so the customer can ask for more: each tool on a result card has a "Find cheaper or better options" button, and the toolbar has one for every part. `POST /api/projects/<id>/research` with `{"component_ids": [...], "goal": "cheaper" | "better" | "both"}` (no ids means every part) starts a follow-up run that reuses the current parts, searches for alternatives to the tools already shown and cheaper ones for the business type, skips tools already listed, and saves a new plan version. It is refused while another search runs or after a plan is approved, and approval is refused while the search runs.
 
 ### Not yet verified
-- Decomposition and extraction quality with a real model. The tests use the stub.
+- Decomposition, extraction and setup-guide quality with a real model across many businesses. The tests use the stub; real-model checks so far are manual spot checks and the mining A/B test above.
 - Brave result quality, and how often vendor pricing pages are readable without a browser.
 - Catalog prices were read on 2026-11-06. They include caveats (see `pricing_notes`), and Canva and Wix paid plans are unknown.
 
@@ -165,12 +201,25 @@ API: `POST /api/projects`, `GET /api/projects/<id>`, `POST /api/projects/<id>/an
 6. Check off one implementation step and click **Save my plan** to print the Decision Passport.
 7. Optionally use the synthetic customer CSV or discover an official vendor page in the expanded research section.
 
+## Deploy
+
+Any host that keeps a normal server process running works (e.g. Render). Serverless hosts such as Vercel don't: consultations run in background threads after the request returns.
+
+- Start command: `gunicorn app:app --workers 1 --threads 8 --timeout 120`. Use one worker, because running consultations live in that process; threads let the page keep polling while research runs.
+- Set the keys from `.env` in the host's environment settings; `.env` is git-ignored.
+- SQLite files are wiped on free hosts when they restart, so saved projects and discovered tools start fresh. Set `DB_PATH` to a persistent disk for anything beyond a demo.
+- A public link spends your OpenRouter credit on every consultation, so set a credit limit on the key.
+
 ## Project structure
 
 ```
 app.py                     Flask API and data handling
-agent/                     Consultation agent (LangGraph flow, catalog matching, research, pricing, approvals)
-templates/consult.html     Problem → options → approval page
+agent/                     Consultation agent: LangGraph flow (graph.py), research (research.py),
+                           fit ratings (fit.py), pricing, connections and setup plan (connections.py,
+                           workflow.py, setup.py), per-run limits (budget.py), storage (store.py)
+templates/landing.html     Public landing page; solutions.html explains capabilities
+templates/consult.html     Problem → tools per need → setup plan page
+static/consult-*.js/.css   Consultation results, budget recovery and setup-plan UI
 advisor.py                 Readiness and workflow logic
 templates/dashboard.html  Single-dashboard UX and browser interactions
 data/tools.json            Initial tool catalog (research starting point)
