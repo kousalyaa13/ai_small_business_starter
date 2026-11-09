@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const {groupTools, uniqueTasks, billingLabel} = require('../static/consult-results.js');
+const {groupTools, uniqueTasks, billingLabel, sourceChecks} = require('../static/consult-results.js');
 
 function assignment(id, capability, description, cost, source='catalog', tool='Smartsheet') {
   return {component_id:id, capability, description, monthly_cost:cost, source,
@@ -34,4 +34,17 @@ const bundle = {assignments:[
 assert.equal(groupTools(bundle).length,2,'distinct products remain distinct in a bundle');
 assert.equal(billingLabel('Pro (annual billing)'),'Annual commitment');
 assert.equal(billingLabel('Team (monthly billing)'),'Billed monthly');
+const curated = sourceChecks({vetted:true,site:'https://www.smartsheet.com/',pricing_source_url:'https://www.smartsheet.com/pricing',
+  monthly_cost:27,pricing_checked_at:'2026-11-08'});
+assert.equal(curated.status,'Catalog listing reviewed');
+assert.equal(curated.hasVendorLink,true);
+assert.equal(curated.hasPricingLink,true);
+assert.equal(curated.priceShown,true);
+assert.equal(curated.checkedAt,'2026-11-08');
+const unreviewed = sourceChecks({vetted:false,site:'http://unsafe.example',pricing_source_url:'',
+  monthly_cost:null,pricing_checked_at:''});
+assert.equal(unreviewed.status,'Web-discovered; not independently reviewed');
+assert.equal(unreviewed.hasVendorLink,false);
+assert.equal(unreviewed.hasPricingLink,false);
+assert.equal(unreviewed.priceShown,false);
 console.log('Recommendation grouping tests passed');
