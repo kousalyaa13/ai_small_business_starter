@@ -39,6 +39,7 @@ input:not([type=checkbox]):not([type=file]):not([type=radio]),select,textarea{wi
 .source-check>summary{padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12px;font-weight:800;color:#604487}
 .source-check-body{padding:0 12px 12px;font-size:12px;color:#514963}
 .source-check-body p{margin:8px 0;line-height:1.5}
+.source-check-body .source-result{padding:9px 10px;background:#eef7f2;border-radius:8px;color:#245e4d}
 .source-check-body a{font-weight:750;overflow-wrap:anywhere}
 .source-check-body .source-caution{padding:10px;background:#f2ebfa;border-radius:8px;color:#665576;font-size:11px}
 .cost-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.cost-grid label{font-size:12px;font-weight:750;color:#44675d}.cost-grid input{margin-top:6px}.savings{border-top:1px solid #c8e8d9;display:flex;align-items:end;justify-content:space-between;gap:12px;padding-top:14px}.savings strong{font-size:30px;color:#087a5b;letter-spacing:-1px}
@@ -210,8 +211,8 @@ function renderSpotlight(){
  if(t){const p=t.price_estimate,[cls,label]=budgetTag(p);
   $('top-price').innerHTML=`<span>${esc(priceText(p))}</span><span class="pill ${cls}">${esc(label)}</span>`;
   $('main-reason').textContent=(t.reasons||[]).slice(0,2).join(' · ')||t.description;
-   $('top-source').innerHTML=(t.status==='vetted'?'Curated catalog listing':'Unreviewed listing') +
-     ' · Privacy and security not assessed · ' +
+   $('top-source').innerHTML=(t.status==='vetted'?'Curated catalog listing':'Web-discovered listing') +
+     ' · Basic source screening: ' + sourceLinkCount(t) + '/2 HTTPS links recorded · ' +
      (p?.source_url && url(p.source_url)!=='#' ? 'Pricing reference: <a href="' +
        esc(url(p.source_url)) + '" target="_blank" rel="noopener noreferrer">vendor source ↗</a>' +
        (p.checked_at ? ' (checked ' + esc(dateText(p.checked_at)) + ')' : '') :
@@ -220,6 +221,10 @@ function renderSpotlight(){
  const blockers=report.readiness?.blockers||[];
  $('top-warning').hidden=!blockers.length;$('top-warning').textContent=blockers.length?'Before you start: '+blockers[0]:'';
 }
+function sourceLinkCount(t) {
+ const p=t.price_estimate;
+ return Number(url(t.site)!=='#') + Number(url(p?.source_url||t.pricing_source_url)!=='#');
+}
 function trustBlock(t) {
  const p=t.price_estimate, e=t.review_evidence||{};
  const vendor=url(t.site), pricing=url(p?.source_url||t.pricing_source_url);
@@ -227,15 +232,17 @@ function trustBlock(t) {
  const link=(href,label)=>href==='#'?'':'<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+' ↗</a>';
  const reviewed=t.status==='vetted';
  const date=p?.checked_at||t.pricing_checked_at||'';
+ const count=sourceLinkCount(t);
  return '<details class="source-check"><summary>Trust &amp; sources <span class="tag '+
-   (reviewed?'ok':'unknown')+'">'+(reviewed?'Reviewed listing':'Not reviewed')+'</span></summary>'+
+   (count===2?'ok':'unknown')+'">'+count+'/2 source links</span></summary>'+
    '<div class="source-check-body">'+
-   '<p><b>Vendor website:</b> '+(vendor==='#'?'No vendor link recorded':link(vendor,'Visit vendor site'))+'</p>'+
+   '<p class="source-result"><b>Basic source screening:</b> '+count+'/2 HTTPS links recorded · '+(reviewed?'Curated catalog listing':'Web-discovered listing')+'</p>'+
+   '<p><b>Vendor website:</b> '+(vendor==='#'?'No source link recorded':link(vendor,'Visit vendor site'))+'</p>'+
    '<p><b>Pricing:</b> '+(pricing==='#'?'No pricing source recorded':link(pricing,'View pricing source')+
      (date?' · Checked '+esc(dateText(date)):'')+(p?'':' · Plan price unconfirmed'))+'</p>'+
    '<p><b>Independent reviews:</b> Not assessed'+(reviewSearch==='#'?'.':' · '+link(reviewSearch,'Search G2'))+'</p>'+
-   '<p><b>Privacy &amp; security:</b> Not independently assessed.</p>'+
-   '<p class="source-caution">A catalog review or source link is not a safety certification. Check privacy, data handling and terms before sharing customer data.</p>'+
+   '<p><b>Security assessment:</b> Demo preview — independent review not yet implemented.</p>'+
+   '<p class="source-caution">Recorded links do not certify vendor safety. Check privacy, data handling and terms before sharing customer data.</p>'+
    '</div></details>';
 }
 function renderTools(){
