@@ -36,3 +36,29 @@
 @media(max-width:640px){.flow-detail{grid-template-columns:1fr;gap:2px}}
 .setup-start{margin-top:14px;border:1px solid #c9d6ef;background:#f4f7fe;border-radius:14px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
 .setup-start p{margin:4px 0 0}.setup-start #setup-start-msg{flex-basis:100%;margin:0}
+
+/* Compact, readable overview: connections first, technical instructions on demand. */
+.setup-flow-overview{display:grid;gap:14px}
+.setup-flow-intro{margin:0;color:#657087}
+.setup-flow-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px}
+.setup-flow-card{border:1px solid #e4d9f1;background:linear-gradient(145deg,#fff 0%,#fcfaff 100%);border-radius:18px;padding:18px;min-width:0}
+.setup-flow-path{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.setup-flow-node{border:1px solid #d9cbea;background:white;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:800;color:#382749;min-width:0;overflow-wrap:anywhere;text-align:center}
+.setup-flow-node.connector{border-color:#b9dcca;background:#edf9f2;color:#16634b}
+.setup-flow-connector{font-size:22px;font-weight:700;color:#8b70b6}
+.setup-flow-summary{margin-top:16px;display:grid;gap:7px}
+.setup-flow-summary p{margin:0;color:#4b5870;font-size:14px;line-height:1.5}
+.setup-flow-method{font-size:12px;font-weight:800;color:#16634b}
+.setup-flow-card.route-warn .setup-flow-method{color:#98631e}
+.setup-flow-card.route-muted .setup-flow-method{color:#69748a}
+.setup-flow-more{margin-top:14px;border-top:1px solid #e9e3f1;padding-top:12px}
+.setup-flow-more summary{cursor:pointer;font-size:13px;font-weight:800;color:#6942a3}
+.setup-flow-more summary:hover{text-decoration:underline}
+.setup-flow-detail{margin-top:12px}
+.setup-flow-detail b{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#657087}
+.setup-flow-detail p{margin:4px 0 0;font-size:13px;line-height:1.6;color:#394860;overflow-wrap:anywhere}
+.setup-flow-more .caption{margin:10px 0 0;overflow-wrap:anywhere}
+.setup-flow-independent{margin:0;padding:12px 14px;border-radius:12px;background:#f6f8fc}
+.setup-guide{list-style:decimal}
+.guide-title input{width:20px;height:20px;flex-shrink:0}
+@media(max-width:640px){.setup-flow-grid{grid-template-columns:minmax(0,1fr)}.setup-flow-node{font-size:13px;padding:9px 10px}.setup-flow-connector{font-size:18px}}
