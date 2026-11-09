@@ -128,25 +128,52 @@
     box.querySelectorAll('[data-step]').forEach(input => input.addEventListener('change', () => saveProgress(input)));
   }
 
-  const toolBox = s => '<span class="flow-box"><b>' + esc(s.tool) + '</b></span>';
-  const ROUTE_WORD = {zapier: 'via Zapier', native: 'native integration', built_in: 'built in',
-                      unverified: 'not verified', unchecked: 'not checked', manual: 'by hand'};
+  const ROUTE_WORD = {zapier: 'Automated through Zapier', native: 'Direct connection',
+    built_in: 'Built into the app', unverified: 'Connection needs verification',
+    unchecked: 'Connection not checked', manual: 'Manual transfer'};
 
-  // The mechanics of each connection: when it runs, what moves, and how.
+  // Give owners the big picture first. Keep the implementation details available on demand.
   function flowHtml(wf, steps) {
-    const rows = wf.edges.filter(e => e.kind !== 'manual').map(e => {
+    const edges = (wf.edges || []).filter(e => e.kind !== 'manual');
+    const rows = edges.map(e => {
       const r = e.route || {};
-      const detail = (label, text) => text ? '<div class="flow-detail"><span>' + label + '</span><p>' + esc(text) + '</p></div>' : '';
-      return '<div class="flow-row"><div class="flow-line">' + toolBox(steps[e.from]) +
-        '<span class="flow-arrow ' + (ROUTE_CLASS[r.route] || '') + '"><span>' + esc(ROUTE_WORD[r.route] || '') + '</span></span>' +
-        toolBox(steps[e.to]) + '</div>' + detail('When', e.when) + detail('What moves', e.what_moves) + detail('How', e.how) +
-        '<p class="caption flow-route">' + esc(r.label || '') + (r.note ? ' · ' + esc(r.note) : '') +
-        (r.sources?.length ? ' · ' + r.sources.map((u, i) => link(u, 'source ' + (i + 1))).join(' ') : '') + '</p></div>';
+      const viaZapier = r.route === 'zapier';
+      const source = steps[e.from]?.tool || e.from;
+      const target = steps[e.to]?.tool || e.to;
+      const routeClass = ROUTE_CLASS[r.route] || 'route-muted';
+      const node = (name, modifier) => '<span class="setup-flow-node ' + (modifier || '') + '">' +
+        esc(name) + '</span>';
+      const path = node(source, 'source') +
+        '<span class="setup-flow-connector" aria-hidden="true">→</span>' +
+        (viaZapier ? node('Zapier', 'connector') +
+          '<span class="setup-flow-connector" aria-hidden="true">→</span>' : '') +
+        node(target, 'target');
+      const detail = (label, value) => value ? '<div class="setup-flow-detail"><b>' + label +
+        '</b><p>' + esc(value) + '</p></div>' : '';
+      const sources = (r.sources || []).map((url, i) => link(url, 'Source ' + (i + 1))).filter(Boolean).join(' · ');
+      const description = e.what_moves || e.when || 'Connect these tools to keep information in sync.';
+      return '<article class="setup-flow-card ' + routeClass + '">' +
+        '<div class="setup-flow-path">' + path + '</div>' +
+        '<div class="setup-flow-summary"><span class="setup-flow-method">' +
+        esc(ROUTE_WORD[r.route] || 'Connection') + '</span><p>' + esc(description) + '</p></div>' +
+        '<details class="setup-flow-more"><summary>How does this connection work?</summary>' +
+        detail('When', e.when) + detail('Information shared', e.what_moves) +
+        detail('How to connect', e.how) +
+        (r.label || r.note ? '<p class="caption">' + esc([r.label, r.note].filter(Boolean).join(' · ')) + '</p>' : '') +
+        (sources ? '<p class="caption">' + sources + '</p>' : '') + '</details></article>';
     }).join('');
-    const alone = wf.steps.filter(s => s.standalone).map(s => esc(s.tool));
-    return '<div class="flow">' + (rows || '<p class="caption">None of your tools need to exchange data.</p>') +
-      (alone.length ? '<p class="caption">' + alone.join(', ') + (alone.length === 1 ? ' runs' : ' run') +
-        ' on its own; no data needs to move to or from ' + (alone.length === 1 ? 'it' : 'them') + '.</p>' : '') + '</div>';
+    // Do not list a tool as standalone if it also participates in a connection.
+    const connected = new Set(edges.flatMap(e => [e.from, e.to]));
+    const alone = (wf.steps || []).filter(s => s.standalone && !connected.has(s.id))
+      .map(s => s.tool).filter(Boolean);
+    const uniqueAlone = [...new Set(alone)];
+    return '<div class="setup-flow-overview">' +
+      '<p class="caption setup-flow-intro">Here’s how your selected tools share information. ' +
+      'Open a connection for the technical details, or follow the checklist below to set everything up.</p>' +
+      (rows ? '<div class="setup-flow-grid">' + rows + '</div>' :
+        '<p class="caption">No connections between your selected tools are required.</p>') +
+      (uniqueAlone.length ? '<p class="caption setup-flow-independent"><b>Works independently:</b> ' +
+        esc(uniqueAlone.join(', ')) + '. No connection needed for these tools.</p>' : '') + '</div>';
   }
 
   // One ordered guide across all tools: sign up, configure, connect, test, go live.
