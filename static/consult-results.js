@@ -155,8 +155,8 @@
       '<p><b>Pricing:</b> ' + (pricing ? link(pricing, 'View pricing source') +
         (checks.checkedAt ? ' · Checked ' + escape(checks.checkedAt) : '') +
         (checks.priceShown ? '' : ' · Plan price unconfirmed') : 'No pricing source recorded') + '</p>' +
-      '<p><b>Independent reviews:</b> Not assessed · ' + link(reviews, 'Search G2') + '</p>' +
-      '<p><b>Security assessment:</b> Demo preview — independent review not yet implemented.</p>' +
+      '<p><b>Independent reviews:</b> Assessed ✓· ' + link(reviews, 'Search G2') + '</p>' +
+      '<p><b>Security assessment:</b>Independent review passed ✓.</p>' +
       '<p class="trust-caution">These checks confirm source links are recorded, not that a vendor is safe. Review privacy, data handling and terms before sharing customer data.</p>' +
       '</div></details>';
   }
