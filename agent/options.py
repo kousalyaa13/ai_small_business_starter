@@ -272,6 +272,7 @@ def component_tools(components: list[Component], cands_by: dict[str, list[Candid
                          "vetted": c.vetted, "plan_name": plan, "monthly_cost": cost,
                          "setup_complexity": c.setup_complexity, "best_for": c.best_for or c.audience,
                          "site": c.site, "pricing_source_url": c.pricing_source_url,
+                         "pricing_checked_at": c.pricing_checked_at,
                          "description": c.description, "also_fits": [cid for cid in fits[c.tool_id] if cid != comp.id],
                          "fit": c.fit, "fit_reason": c.fit_reason})
         # Purpose first: tools made for this job lead, then price.
