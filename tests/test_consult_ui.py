@@ -19,6 +19,13 @@ class ConsultationLayoutTests(unittest.TestCase):
         self.assertNotIn("compare-view", ids)
         self.assertNotIn("compare-toggle", ids)
         self.assertNotIn("research-all", ids)  # searches run per need, never for everything at once
+        # After the owner chooses: the connection check and the setup plan.
+        self.assertIn("connection-check", ids)
+        self.assertIn("setup-plan", ids)
+        self.assertLess(html.index("consult-results.js"), html.index("consult-setup.js"))
+        setup_js = (ROOT / "static" / "consult-setup.js").read_text()
+        self.assertIn("Build my setup guide", setup_js)  # a saved draft leads to the setup guide
+        self.assertIn("/approve", setup_js)
         # Pricing-only questions (contacts, automated tasks, seats) were removed: they never change which tools fit.
         self.assertNotIn("pricing-questions", ids)
 

@@ -97,6 +97,35 @@ def price_selection(project_id):
     return jsonify({"option": option.model_dump()})
 
 
+@bp.post("/api/projects/<project_id>/connections")
+def check_connections(project_id):
+    """Before saving: can the picked tools exchange data where they need to?"""
+    try:
+        body = SelectionRequest.model_validate(request.get_json(silent=True) or {})
+        connections = service().check_connections(project_id, body.selections)
+    except ValidationError as exc:
+        return _validation_error(exc)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"connections": connections})
+
+
+@bp.post("/api/projects/<project_id>/setup/progress")
+def setup_progress(project_id):
+    body = request.get_json(silent=True) or {}
+    key = str(body.get("key", "")).strip()
+    if not key:
+        return jsonify({"error": "Missing checklist step."}), 400
+    service().set_progress(project_id, key, bool(body.get("done")))
+    return jsonify({"status": "saved"})
+
+
+@bp.post("/api/projects/<project_id>/setup/retry")
+def setup_retry(project_id):
+    service().retry_setup(project_id)
+    return jsonify({"status": "accepted"}), 202
+
+
 @bp.post("/api/projects/<project_id>/approve")
 def approve(project_id):
     try:

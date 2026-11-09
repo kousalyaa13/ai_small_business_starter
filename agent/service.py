@@ -1,6 +1,7 @@
 """Application-facing operations for the consultation flow."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from .budget import Limits, Meter
@@ -10,7 +11,10 @@ from .graph import Deps, build_graph, sqlite_checkpointer
 from .llm import default_model
 from .research import default_fetcher, default_search
 from .runner import Runner
+from .connections import check_pair, route_for
 from .options import build_selection, component_tools
+from .setup import build_setup_plan
+from .workflow import build_workflow
 from .schemas import Answers, ApprovalRequest, Candidate, Component, Intake, RevisionRequest
 from .store import RunActive, Store
 
@@ -34,6 +38,9 @@ def plain_note(tools, researched, business_type):
             else f"We {found} for this{made}.")
 
 
+log = logging.getLogger(__name__)
+
+
 class NotFound(Exception):
     pass
 
@@ -45,8 +52,9 @@ class Conflict(Exception):
 
 
 class AgentService:
-    def __init__(self, store: Store, runner: Runner, catalog_loader=default_catalog):
+    def __init__(self, store: Store, runner: Runner, catalog_loader=default_catalog, deps=None):
         self.store, self.runner, self.catalog_loader = store, runner, catalog_loader
+        self.deps = deps  # model, search and fetcher, reused for setup plans and connection checks
 
     @classmethod
     def create(cls, db_path, checkpoint_path=None, model=None, search=DEFAULT, fetcher=DEFAULT,
@@ -61,7 +69,7 @@ class AgentService:
         if load_catalog:
             deps.load_catalog = load_catalog
         graph = build_graph(deps, sqlite_checkpointer(checkpoint_path))
-        return cls(store, Runner(store, graph, executor=executor), deps.load_catalog)
+        return cls(store, Runner(store, graph, executor=executor), deps.load_catalog, deps)
 
     def _project(self, project_id, org_id):
         project = self.store.get_project(project_id)
@@ -149,7 +157,59 @@ class AgentService:
         run = self.store.latest_run(project_id)
         if run and run["status"] == "waiting_approval":
             self.runner.submit(run["id"], resume={"approval_id": approval["id"]}, from_statuses=("waiting_approval",))
+        # Build the owner's setup plan once, in the background (repeat approvals find it already built).
+        self.runner.executor.submit(self.build_setup, project_id, approval["id"])
         return approval, created
+
+    # ---- after approval: setup plan, connection checks and checklist progress
+
+    def build_setup(self, project_id, approval_id):
+        if self.deps is None or not self.store.claim_setup_plan(approval_id):
+            return
+        try:
+            approval = self.store.approval_for_project(project_id)
+            if not approval or approval["id"] != approval_id:
+                raise LookupError("approval not found")
+            plan = self.store.latest_plan(project_id)
+            snap = self.store.get_run(plan["run_id"])["snapshot"]
+            _, intake = self.store.latest_requirements(project_id)
+            meter = Meter(self.store, plan["run_id"], project_id, self.deps.limits)
+            payload = build_setup_plan(meter, self.deps.model, self.store, self.deps.search, self.deps.fetcher,
+                                       Intake.model_validate(intake), snap.get("components", []),
+                                       approval["option"], approval["max_build_budget"])
+            self.store.finish_setup_plan(approval_id, payload)
+        except Exception:
+            log.exception("setup plan for approval %s failed", approval_id)
+            self.store.finish_setup_plan(approval_id, error="We couldn't build your setup plan. Please try again.")
+
+    def retry_setup(self, project_id, org_id="default"):
+        self._project(project_id, org_id)
+        approval = self.store.approval_for_project(project_id)
+        if not approval:
+            raise Conflict("Save a plan first.")
+        self.runner.executor.submit(self.build_setup, project_id, approval["id"])
+
+    def check_connections(self, project_id, selections: dict, org_id="default"):
+        """Before saving: can the picked tools exchange data where they need to? Cached per tool pair."""
+        option = self.price_selection(project_id, selections, org_id).model_dump()
+        _, components, _, _ = self._plan_context(project_id)
+        workflow = build_workflow([c.model_dump() for c in components], option)
+        steps = {s["id"]: s for s in workflow["steps"]}
+        out = []
+        for edge in workflow["edges"]:
+            src, dst = steps[edge["from"]], steps[edge["to"]]
+            check = (check_pair(self.store, self.deps.search, self.deps.fetcher, src, dst)
+                     if edge["kind"] == "connector" and self.deps else None)
+            out.append({"id": edge["id"], "from": src["tool"], "to": dst["tool"], "need": edge["need"],
+                        **route_for(edge, src, dst, check)})
+        return out
+
+    def set_progress(self, project_id, step_key, done, org_id="default"):
+        self._project(project_id, org_id)
+        approval = self.store.approval_for_project(project_id)
+        if not approval:
+            raise Conflict("Save a plan first.")
+        self.store.set_progress(approval["id"], step_key[:60], done)
 
     def _plan_context(self, project_id):
         """Parts, candidates and intake behind the latest plan, from the run that produced it."""
@@ -167,6 +227,15 @@ class AgentService:
         self._project(project_id, org_id)
         _, components, cands, intake = self._plan_context(project_id)
         return build_selection(components, cands, intake, selections)
+
+    def _setup_status(self, approval):
+        if not approval:
+            return None
+        plan = self.store.setup_plan(approval["id"])
+        if not plan:
+            return {"status": "building", "plan": None, "done": []}
+        return {"status": plan["status"], "plan": plan["payload"] if plan["status"] == "ready" else None,
+                "error": plan["error"], "done": self.store.progress(approval["id"])}
 
     def status(self, project_id, org_id="default"):
         project = self._project(project_id, org_id)
@@ -216,4 +285,5 @@ class AgentService:
             "components": components, "research_notes": snap.get("research_notes", []),
             "plan": {"id": plan["id"], "version": plan["version"], **plan["payload"]} if plan else None,
             "approval": approval, "usage": usage, "recovery": recovery,
+            "setup": self._setup_status(approval),
         }

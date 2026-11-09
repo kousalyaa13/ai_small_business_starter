@@ -410,7 +410,11 @@
     writeJSON(picksKey(), picks);
     drawNeeds();
     schedulePreview();
+    announcePicks();
   }
+  // Other scripts (the connection check) listen for the owner's current picks.
+  const announcePicks = () => document.dispatchEvent(new CustomEvent('bloom:picks', {detail: {...picks}}));
+  root.bloomPicks = () => ({...picks});
   function schedulePreview() {
     const key = JSON.stringify(picks);
     if (key === previewKey && preview) return;
@@ -510,6 +514,7 @@
       lastDrawn = signature;
       drawNeeds();
       schedulePreview();
+      announcePicks();
     }
     byId('approve-line').hidden = !editable();
     byId('approved').hidden = !approval;

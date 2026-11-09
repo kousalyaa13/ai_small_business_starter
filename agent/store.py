@@ -36,7 +36,16 @@ CREATE TABLE IF NOT EXISTS approvals (
     plan_id TEXT NOT NULL UNIQUE REFERENCES plans(id), plan_version INTEGER NOT NULL,
     option_id TEXT NOT NULL, recurring_cost TEXT NOT NULL, max_build_budget REAL NOT NULL,
     authorized_actions TEXT NOT NULL, idempotency_key TEXT NOT NULL, created_at TEXT NOT NULL,
+    option TEXT NOT NULL DEFAULT '{}',  -- the approved option: which tool covers which need
     UNIQUE (project_id, idempotency_key));
+CREATE TABLE IF NOT EXISTS setup_plans (
+    approval_id TEXT PRIMARY KEY REFERENCES approvals(id), status TEXT NOT NULL,
+    payload TEXT NOT NULL DEFAULT '{}', error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS setup_progress (
+    approval_id TEXT NOT NULL REFERENCES approvals(id), step_key TEXT NOT NULL, done INTEGER NOT NULL,
+    updated_at TEXT NOT NULL, PRIMARY KEY (approval_id, step_key));
+CREATE TABLE IF NOT EXISTS connection_cache (
+    pair_key TEXT PRIMARY KEY, payload TEXT NOT NULL, checked_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS usage_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, project_id TEXT NOT NULL,
     kind TEXT NOT NULL, provider TEXT, model TEXT, task TEXT,
@@ -63,6 +72,9 @@ CREATE TABLE IF NOT EXISTS research_cache (
 DISCOVERED_COLUMNS = {"audience": "TEXT", "setup_complexity": "TEXT", "best_for": "TEXT",
                       "mentions": "INTEGER DEFAULT 0", "small_business_fit": "INTEGER",
                       "found_for": "TEXT NOT NULL DEFAULT '[]'"}  # capabilities of the needs a tool was found for
+
+
+APPROVAL_COLUMNS = {"option": "TEXT NOT NULL DEFAULT '{}'"}
 
 
 class RunActive(Exception):
@@ -98,10 +110,11 @@ class Store:
             con.execute("PRAGMA journal_mode=WAL")
             con.executescript(SCHEMA)
             # Databases created before these columns existed get them added in place.
-            have = {r[1] for r in con.execute("PRAGMA table_info(discovered_tools)")}
-            for column, kind in DISCOVERED_COLUMNS.items():
-                if column not in have:
-                    con.execute(f"ALTER TABLE discovered_tools ADD COLUMN {column} {kind}")
+            for table, columns in (("discovered_tools", DISCOVERED_COLUMNS), ("approvals", APPROVAL_COLUMNS)):
+                have = {r[1] for r in con.execute(f"PRAGMA table_info({table})")}
+                for column, kind in columns.items():
+                    if column not in have:
+                        con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
 
     @contextmanager
     def connect(self):
@@ -328,19 +341,30 @@ class Store:
             if option_id not in options:
                 raise UnknownOption("Choose one of the listed options.")
             option = options[option_id]
-            if (not option["total_is_complete"]
-                    or any(a["source"] == "none" for a in option["assignments"])):
-                raise UnknownOption("This option has unresolved tools or prices. Refine your request before approving.")
+            # Unlisted prices don't block saving (the setup plan asks the owner to confirm them);
+            # a need with no choice at all does.
+            if any(a["source"] == "none" for a in option["assignments"]):
+                raise UnknownOption("Choose a tool, “I already have this” or “Skip” for every need before saving.")
             recurring = {"monthly_total": option["monthly_total"], "total_is_complete": option["total_is_complete"],
                          "tools": [{"tool": a["tool_name"], "plan": a["plan_name"], "monthly_cost": a["monthly_cost"],
                                     "need": a.get("description", ""), "choice": a["source"]}
                                    for a in option["assignments"]], "assumptions": option["assumptions"]}
             approval_id = new_id("apr")
-            con.execute("INSERT INTO approvals VALUES (?,?,?,?,?,?,?,?,?,?)",
+            con.execute("INSERT INTO approvals (id, project_id, plan_id, plan_version, option_id, recurring_cost, "
+                        "max_build_budget, authorized_actions, idempotency_key, created_at, option) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                         (approval_id, project_id, plan["id"], plan_version, option_id, json.dumps(recurring),
-                         max_build_budget, json.dumps(authorized_actions), idempotency_key, now_iso()))
+                         max_build_budget, json.dumps(authorized_actions), idempotency_key, now_iso(),
+                         json.dumps(option)))
             row = con.execute("SELECT * FROM approvals WHERE id=?", (approval_id,)).fetchone()
         return self._approval(row), True
+
+    def approval_for_project(self, project_id):
+        """The project's most recent approval (only one plan can be approved per version)."""
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM approvals WHERE project_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1",
+                              (project_id,)).fetchone()
+        return self._approval(row)
 
     def approval_for_plan(self, plan_id):
         with self.connect() as con:
@@ -357,6 +381,7 @@ class Store:
             return None
         approval = dict(row)
         approval["recurring_cost"] = json.loads(approval["recurring_cost"])
+        approval["option"] = json.loads(approval.get("option") or "{}")
         approval["authorized_actions"] = json.loads(approval["authorized_actions"])
         return approval
 
@@ -432,6 +457,59 @@ class Store:
         with self.connect() as con:
             row = con.execute("SELECT fit, reason FROM fit_cache WHERE key=?", (key,)).fetchone()
         return (row["fit"], row["reason"]) if row else None
+
+    # ---- setup plans (built once per approval), checklist progress, connection checks
+
+    def setup_plan(self, approval_id):
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM setup_plans WHERE approval_id=?", (approval_id,)).fetchone()
+        if not row:
+            return None
+        plan = dict(row)
+        plan["payload"] = json.loads(plan["payload"])
+        return plan
+
+    def claim_setup_plan(self, approval_id):
+        """Mark a setup plan as building; False if one is already built or being built (idempotent)."""
+        ts = now_iso()
+        with self.tx() as con:
+            cur = con.execute("INSERT OR IGNORE INTO setup_plans (approval_id, status, created_at, updated_at) "
+                              "VALUES (?,?,?,?)", (approval_id, "building", ts, ts))
+            if cur.rowcount:
+                return True
+            row = con.execute("SELECT status FROM setup_plans WHERE approval_id=?", (approval_id,)).fetchone()
+            if row["status"] == "failed":  # a failed attempt may be retried
+                con.execute("UPDATE setup_plans SET status='building', error=NULL, updated_at=? WHERE approval_id=?",
+                            (ts, approval_id))
+                return True
+            return False
+
+    def finish_setup_plan(self, approval_id, payload=None, error=None):
+        with self.tx() as con:
+            con.execute("UPDATE setup_plans SET status=?, payload=?, error=?, updated_at=? WHERE approval_id=?",
+                        ("failed" if error else "ready", json.dumps(payload or {}), error, now_iso(), approval_id))
+
+    def set_progress(self, approval_id, step_key, done):
+        with self.tx() as con:
+            con.execute("INSERT OR REPLACE INTO setup_progress VALUES (?,?,?,?)",
+                        (approval_id, step_key, 1 if done else 0, now_iso()))
+
+    def progress(self, approval_id):
+        with self.connect() as con:
+            rows = con.execute("SELECT step_key FROM setup_progress WHERE approval_id=? AND done=1",
+                               (approval_id,)).fetchall()
+        return [r["step_key"] for r in rows]
+
+    def get_connection(self, pair_key, max_age_days=30):
+        cutoff = datetime.fromtimestamp(time.time() - max_age_days * 86400, timezone.utc).isoformat(timespec="seconds")
+        with self.connect() as con:
+            row = con.execute("SELECT payload FROM connection_cache WHERE pair_key=? AND checked_at >= ?",
+                              (pair_key, cutoff)).fetchone()
+        return json.loads(row["payload"]) if row else None
+
+    def save_connection(self, pair_key, payload):
+        with self.tx() as con:
+            con.execute("INSERT OR REPLACE INTO connection_cache VALUES (?,?,?)", (pair_key, json.dumps(payload), now_iso()))
 
     def cache_get(self, run_id, kind, key):
         with self.connect() as con:

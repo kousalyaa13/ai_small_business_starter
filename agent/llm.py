@@ -35,14 +35,14 @@ class ModelClient(Protocol):
         ...
 
 
-OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano", "mine": "openai/gpt-5-nano", "fit": "openai/gpt-5-nano"}
+OPENROUTER_DEFAULTS = {"decompose": "openai/gpt-5-mini", "extract": "openai/gpt-5-nano", "mine": "openai/gpt-5-nano", "fit": "openai/gpt-5-nano", "setup": "openai/gpt-5-mini"}
 
 
 # Default reasoning made each extraction call take 18-32 s. "low" measured ~23 s for a whole
 # research step (3 candidates in parallel) with correct relevance; "minimal" was ~10 s but
 # tagged unrelated products with almost every capability.
 # Override with AGENT_REASONING_<TASK> (none|minimal|low|medium|high).
-REASONING_DEFAULTS = {"extract": "low", "mine": "low", "fit": "low"}
+REASONING_DEFAULTS = {"extract": "low", "mine": "low", "fit": "low", "setup": "medium"}
 
 
 def reasoning_for(task: str) -> str | None:
@@ -134,6 +134,8 @@ class StubModel:
             result = self._extract(content)
         elif schema is ArticleTools:
             result = self._mine(content)
+        elif schema.__name__ == "SetupGuide":
+            result = _stub_setup(content, schema)
         elif schema is FitAssessments:
             result = _stub_fit(content)
         else:
@@ -202,6 +204,21 @@ class StubModel:
                              small_business_fit=not enterprise, audience="enterprises" if enterprise else "small businesses",
                              setup_complexity="developer" if re.search(r"\bAPI\b|SDK|developers?", text) else "unknown",
                              description_quote=description, plans=plans, api_available=None, api_quote="")
+
+
+def _stub_setup(content, schema):
+    """Offline stand-in: a sensible ordered guide and one explanation per connection."""
+    tools = re.findall(r"^\[(s\d+)\] (.+?) — used for: ([^|\n]*)", content, re.M)
+    links = re.findall(r"^\[(e\d+)\] From (.+?) to (.+?) \| route: ([^|\n]*)", content, re.M)
+    steps = [{"title": f"Set up {name}", "tool": label, "references": [],
+              "substeps": [f"Create your {name} account.", f"Configure {name} for: {need.strip()}"]}
+             for label, name, need in tools]
+    steps += [{"title": f"Connect {a} to {b}", "tool": "", "references": [],
+               "substeps": [f"Connect {a} and {b} ({route.strip()}).", "Send a test record and check it arrives once."]}
+              for _, a, b, route in links]
+    flows = [{"label": label, "when": f"Something new happens in {a}.", "what_moves": "The new record's details.",
+              "how": route.strip()} for label, a, b, route in links]
+    return schema.model_validate({"flows": flows, "steps": steps})
 
 
 def _stub_fit(content):
