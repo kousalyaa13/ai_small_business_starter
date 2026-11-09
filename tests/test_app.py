@@ -86,6 +86,20 @@ class AppTests(unittest.TestCase):
         self.assertIn(b'Calculate your potential value', r.data)
         self.assertNotIn(b'Business health check</button>', r.data)
 
+    def test_dashboard_discloses_evidence_without_inventing_ratings(self):
+        page = self.client.get('/dashboard').get_data(as_text=True)
+        self.assertIn('Trust &amp; sources', page)
+        self.assertIn('Not independently assessed', page)
+        self.assertIn('Search G2', page)
+        self.assertNotIn('Customer reviews on G2 ↗', page)
+        result = self.client.post('/api/recommend', json={
+            'industry': 'coffee', 'problem': 'marketing', 'software': 'Square', 'budget': '75'})
+        self.assertEqual(result.status_code, 200)
+        for tool in result.get_json()['tools']:
+            self.assertIn('status', tool)
+            self.assertIn('site', tool)
+            self.assertIn('pricing_source_url', tool)
+
     def test_solutions(self):
         r = self.client.get('/solutions')
         self.assertEqual(r.status_code, 302)
