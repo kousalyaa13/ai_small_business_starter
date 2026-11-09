@@ -107,7 +107,11 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
     <p class="caption" id="plan-meta" style="margin-top:6px"></p></div>
     
    </div>
-     <div class="options" id="options"></div>
+     <div class="results-workspace">
+      <div class="options" id="options"></div>
+      <aside id="selection-summary" class="selection-summary-top"
+             aria-label="Your selection and monthly software budget" aria-live="polite"></aside>
+     </div>
      <p class="selection-note" id="selection-note">Choosing a tool saves your decision here. BloomBot does not purchase or install software.</p>
      <details id="approve-line" class="setup-budget-control"><summary>Optional: set a one-time setup budget</summary>
       <label class="field" style="max-width:280px">Maximum one-time setup budget ($)<input id="build-budget" type="number" min="0" value="0"></label>
