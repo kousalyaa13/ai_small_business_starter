@@ -78,7 +78,7 @@ Cheaper mining (minimal reasoning, or 8,000 instead of 12,000 characters of arti
 The `/consult` results page is now designed for nontechnical business owners:
 
 - A compact **recommendations ready** summary replaces the seven progress chips after the run finishes. Identified tasks are available in a single optional disclosure.
-- Each recommendation is a **product-first card** with a prominent vendor name, recognizable site icon, plan, total price, billing commitment, task coverage, and **Visit website** link. Site icons are loaded from the public Google favicon service using the vendor's HTTPS domain; a letter fallback is shown if an icon is unavailable.
+- Each recommendation is a **product-first card** with a prominent vendor name, recognizable site icon, plan, total price, billing commitment, task coverage, and **Visit website** link. Site icons are loaded from the vendor's own HTTPS site (`/favicon.ico`); a letter fallback is shown if an icon is unavailable.
 - Tasks fulfilled by the **same product appear once** under that product. Included capabilities do not add duplicate charges. Bundled options show distinct products separately.
 - Each tool shows where it came from: **Reviewed listing** (from the curated catalog) or **Web-discovered**. **View evidence** shows the recorded source links. These checks confirm sources are recorded, not that a vendor is safe; the security assessment is labelled as a demo preview.
 - **Compare tools** switches to a consistent side-by-side table; the old per-task "other tool fits this part" links are removed from the customer-facing view.
@@ -209,6 +209,26 @@ Any host that keeps a normal server process running works (e.g. Render). Serverl
 - Set the keys from `.env` in the host's environment settings; `.env` is git-ignored.
 - SQLite files are wiped on free hosts when they restart, so saved projects and discovered tools start fresh. Set `DB_PATH` to a persistent disk for anything beyond a demo.
 - A public link spends your OpenRouter credit on every consultation, so set a credit limit on the key.
+
+## Technical stack
+
+| Layer | Technology | Used for |
+|---|---|---|
+| Language | Python 3.10+ (CI runs 3.11) | Backend and agent |
+| Web server | Flask 3, Jinja templates, gunicorn | Pages and JSON API (`app.py`, `agent/api.py`) |
+| Frontend | HTML, CSS and vanilla JavaScript (no framework or build step) | Landing page, dashboard, consultation and setup-plan UI (`templates/`, `static/`) |
+| Agent workflow | LangGraph, with a SQLite checkpointer (`langgraph-checkpoint-sqlite`) | Breakdown → catalog match → research → options → approval, with pauses for questions and approval that survive restarts |
+| Background work | Python thread pools | Runs consultations after the request returns; researches needs, reads articles and checks vendor pages in parallel |
+| Language models | OpenAI Python SDK, through OpenRouter (or OpenAI directly) | Structured outputs with strict JSON schemas. `openai/gpt-5-mini` for the breakdown and setup guide; `openai/gpt-5-nano` for reading articles and vendor pages and rating fit |
+| Data validation | Pydantic v2 | Request bodies, model outputs and stored records (`agent/schemas.py`) |
+| Web research | TinyFish Search API and Fetch API (Brave Search as an alternative) | Finding comparison articles and vendors; reading pages in a real browser as markdown |
+| Direct page fetching | requests, BeautifulSoup | Fallback fetcher with SSRF protection (`agent/safe_fetch.py`) |
+| Storage | SQLite | Projects, runs, plans, approvals, discovered tools, fit and connection caches, setup progress (`agent/store.py`); curated catalog in `data/tools.json` |
+| Documents and data | reportlab, pandas | Plan PDF download; CSV analysis on the dashboard |
+| Configuration | python-dotenv | Loads keys from the git-ignored `.env` |
+| Spend control | Per-run meter (`agent/budget.py`) | Hard limits on searches, page fetches, model calls and tokens per run |
+| Testing and CI | unittest (stub model, fake search and fetch), Node.js script tests, GitHub Actions | Runs on every push to `main` (`.github/workflows/tests.yml`) |
+| External assets | Google Fonts (DM Sans, Manrope), Unsplash photos, vendors' own favicons | Landing page and tool cards; the site still works if they are blocked |
 
 ## Project structure
 
