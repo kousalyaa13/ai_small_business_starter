@@ -7,6 +7,8 @@ Web candidates are always unvetted.
 from __future__ import annotations
 
 import os
+import logging
+import time
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -14,6 +16,8 @@ from typing import Protocol
 from urllib.parse import urlparse
 
 import requests
+
+log = logging.getLogger(__name__)
 
 from .budget import BudgetExceeded, Meter
 from .fit import fit_key
@@ -351,7 +355,11 @@ class Researcher:
         if cached is not None:
             return [SearchResult(**r) for r in cached]
         self.meter.ensure("search")
-        results = self.search.search(query)
+        started = time.monotonic()
+        try:
+            results = self.search.search(query)
+        finally:
+            log.info('research search duration_seconds=%.2f', time.monotonic() - started)
         self.meter.record_search(self.search.provider)
         self.store.cache_put(self.meter.run_id, "search", query, [r.__dict__ for r in results])
         return results
@@ -365,7 +373,11 @@ class Researcher:
         self.meter.ensure("fetch")
         self.meter.record_fetch(getattr(self.fetcher, "provider", "direct"))
         try:
-            page = self.fetcher.fetch(url)
+            started = time.monotonic()
+            try:
+                page = self.fetcher.fetch(url)
+            finally:
+                log.info('research fetch duration_seconds=%.2f host=%s', time.monotonic() - started, base_host(url))
         except FetchError as exc:
             self.store.cache_put(self.meter.run_id, "page", url, {"error": str(exc)})
             raise
