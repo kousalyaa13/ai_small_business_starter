@@ -39,6 +39,7 @@ const curated = sourceChecks({vetted:true,site:'https://www.smartsheet.com/',pri
 assert.equal(curated.status,'Catalog listing reviewed');
 assert.equal(curated.hasVendorLink,true);
 assert.equal(curated.hasPricingLink,true);
+assert.equal(curated.linkCount,2,'two HTTPS source links are recorded');
 assert.equal(curated.priceShown,true);
 assert.equal(curated.checkedAt,'2026-11-08');
 const unreviewed = sourceChecks({vetted:false,site:'http://unsafe.example',pricing_source_url:'',
@@ -46,5 +47,6 @@ const unreviewed = sourceChecks({vetted:false,site:'http://unsafe.example',prici
 assert.equal(unreviewed.status,'Web-discovered; not independently reviewed');
 assert.equal(unreviewed.hasVendorLink,false);
 assert.equal(unreviewed.hasPricingLink,false);
+assert.equal(unreviewed.linkCount,0,'HTTP and missing URLs must not count as HTTPS sources');
 assert.equal(unreviewed.priceShown,false);
 console.log('Recommendation grouping tests passed');
