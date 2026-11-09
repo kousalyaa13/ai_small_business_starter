@@ -323,3 +323,5 @@
 .trust-evidence b{color:#352946}
 .trust-evidence a{font-weight:750;color:#6942b5;overflow-wrap:anywhere}
 .trust-evidence .trust-caution{padding:9px 10px;background:#f8f4fd;border-radius:8px;color:#6c5c79;font-size:10px;margin:10px 0 0}
+.trust-evidence .trust-result{background:#eef7f2;border-radius:8px;padding:9px 10px;color:#245e4d;font-size:11px}
+.trust-evidence .trust-result b{color:#245e4d}
