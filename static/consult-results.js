@@ -86,6 +86,7 @@
     return toolsOf(needById(n.connects[0])).find(t => t.tool_id === chosen[0]) || null;
   };
   const picksKey = () => 'bloom-picks:' + projectId;  // per project: a search's new plan version keeps your picks
+  const savedKey = () => 'bloom-saved-plan:' + projectId;
   const searchKey = () => 'bloom-search:' + projectId;
   const seenKey = () => 'bloom-seen-tools:' + projectId;
   const readJSON = (key, fallback) => { try { return JSON.parse(sessionStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
@@ -342,9 +343,7 @@
     else if (!o) message = 'Pricing your selection…';
     else if (searching()) message = 'You can save once the search for “' + researchingNames() +
       '” finishes (about a minute), so the plan includes the latest tools.';
-    else if (unpriced.length) message = 'Pricing needs verification for ' + [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
-      '. Visit each tool’s website to confirm its current price. These costs are not included in the estimated subtotal.';
-    else canSave = true;
+    else canSave = true; // Unknown vendor prices do not prevent saving a draft.
     const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
       !['skipped','existing','native','none'].includes(a.source)) || [];
     // Deduplicate products used across multiple needs; the server's total remains authoritative.
@@ -358,10 +357,10 @@
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message)) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
+      escape(isSaved ? 'Plan saved in this browser. ' + (unknownNote || '') : (unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message))) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
       (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
       '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
-      '>Save this plan →</button></div>' : '') + '</div>';
+      '>' + (isSaved ? 'Saved ✓' : 'Save this plan →') + '</button></div>' : '') + '</div>';
   }
 
   const researchingNames = () => [...researching].map(id => needById(id)?.description || 'this need').join('”, “');
@@ -460,17 +459,24 @@
 
   async function saveSelection() {
     const button = byId('save-selection');
+    if (!button || !preview) return;
     button.disabled = true;
+    const record = {
+      planId: data.plan.id, planVersion: data.plan.version,
+      savedAt: new Date().toISOString(), selections: {...picks},
+      monthlyKnown: preview.monthly_total,
+      totalIsComplete: !!preview.total_is_complete,
+      assignments: preview.assignments.map(a => ({
+        need: a.description, tool: a.tool_name, plan: a.plan_name,
+        monthlyCost: a.monthly_cost, website: a.site_url || null
+      }))
+    };
     try {
-      const r = await fetch('/api/projects/' + encodeURIComponent(projectId) + '/approve', {method:'POST',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify({plan_version: data.plan.version,
-          option_id: 'custom', selections: picks, max_build_budget: Number(byId('build-budget')?.value) || 0,
-          idempotency_key: 'sel-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random())})});
-      const j = await r.json();
-      if (!r.ok && !(r.status === 409 && j.approval)) throw Error(j.error || 'Could not save this plan');
-      setTimeout(poll, 300);
+      localStorage.setItem(savedKey(), JSON.stringify(record));
+      drawSummary();
     } catch (err) {
-      byId('selection-message').textContent = err.message;
+      const message = byId('selection-message');
+      if (message) message.textContent = 'Could not save in this browser. Check that site storage is enabled.';
       button.disabled = false;
     }
   }
