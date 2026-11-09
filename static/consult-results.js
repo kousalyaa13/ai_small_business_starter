@@ -476,6 +476,41 @@
     byId('approve-line').hidden = !editable();
     byId('approved').hidden = !approval;
     if (approval) {
+      const pdf = byId('approved-pdf');
+      if (pdf) {
+        pdf.href = '/api/projects/' + encodeURIComponent(projectId) + '/plan.pdf';
+        pdf.onclick = async event => {
+          event.preventDefault();
+          if (pdf.dataset.busy) return;
+          pdf.dataset.busy = '1';
+          const original = pdf.textContent;
+          pdf.textContent = 'Preparing PDF…';
+          try {
+            const response = await fetch(pdf.href, {headers:{Accept:'application/pdf'}});
+            if (!response.ok || !(response.headers.get('content-type') || '').includes('application/pdf')) {
+              let message = 'The server could not create your PDF.';
+              try { const body = await response.json(); message = body.error || message; } catch (_) {}
+              throw Error(message);
+            }
+            const blob = await response.blob();
+            if (blob.size < 100 || (await blob.slice(0,5).text()) !== '%PDF-')
+              throw Error('The server returned an invalid PDF.');
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'BloomBots-Business-Setup-Plan.pdf';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          } catch (err) {
+            alert(err.message || 'Unable to download PDF.');
+          } finally {
+            pdf.textContent = original;
+            delete pdf.dataset.busy;
+          }
+        };
+      }
       const tools = (approval.recurring_cost.tools || []).filter(t => !['skipped','existing','native'].includes(t.choice))
         .map(t => t.tool);
       byId('approved-title').textContent = 'Saved to your plan: ' + ([...new Set(tools)].join(' + ') || 'no new tools');
