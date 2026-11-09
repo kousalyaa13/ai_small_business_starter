@@ -6,6 +6,9 @@ writes go through keyed store methods, and research results are cached per run.
 from __future__ import annotations
 
 import operator
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import sqlite3
 from dataclasses import dataclass, field
@@ -24,6 +27,8 @@ from .research import Researcher, SearchClient, base_host
 from .schemas import Candidate, Component, Decomposition, Intake, PlanVersion
 from .store import now_iso
 
+log = logging.getLogger(__name__)
+MAX_RESEARCH_WORKERS = max(1, min(4, int(os.environ.get('AGENT_RESEARCH_WORKERS', '3'))))
 MAX_CLARIFICATION_ROUNDS = 2
 class AgentState(TypedDict, total=False):
     project_id: str
@@ -159,23 +164,34 @@ def build_graph(deps: Deps, checkpointer):
         candidates, notes = dict(state["candidates"]), []
         comps = {c["id"]: Component.model_validate(c) for c in state["components"]}
         forced, goal = set(state.get("force_research", [])), state.get("research_goal")
-        for cid in state["gaps"]:
+        def research_one(cid):
+            started = time.monotonic()
             current = candidates.get(cid, [])
             if cid in forced:
-                # Look past what's already shown: alternatives to the current tools, cheaper and better ones.
                 found, comp_notes = researcher.research(
-                    comps[cid], intake, goal=goal or "both", current_names=[c["name"] for c in current],
+                    comps[cid], intake, goal=goal or "both",
+                    current_names=[c["name"] for c in current],
                     exclude_hosts={base_host(c["site"]) for c in current if c.get("site")})
                 new = [c for c in found if c.tool_id not in {x["tool_id"] for x in current}]
                 comp_notes.append(f"Found {len(new)} new tool(s) for '{comps[cid].description}'." if new else
                                   f"No new tools found for '{comps[cid].description}' beyond those already shown.")
             else:
                 found, comp_notes = researcher.research(comps[cid], intake)
-            # Merge with tools already known for this part; a fresh look replaces the saved copy.
-            fresh = {c.tool_id: c.model_dump() for c in found}
-            kept = [c for c in candidates.get(cid, []) if c["tool_id"] not in fresh]
-            candidates[cid] = [*fresh.values(), *kept]
-            notes.extend(comp_notes)
+            log.info("research component=%s duration_seconds=%.2f tools=%d",
+                     cid, time.monotonic() - started, len(found))
+            return cid, found, comp_notes
+
+        # Independent needs can be researched concurrently. Limit concurrency to avoid
+        # overwhelming the search, fetch and model providers.
+        gaps = list(state["gaps"])
+        with ThreadPoolExecutor(max_workers=min(MAX_RESEARCH_WORKERS, len(gaps))) as pool:
+            futures = {pool.submit(research_one, cid): cid for cid in gaps}
+            for future in as_completed(futures):
+                cid, found, comp_notes = future.result()
+                fresh = {c.tool_id: c.model_dump() for c in found}
+                kept = [c for c in candidates.get(cid, []) if c["tool_id"] not in fresh]
+                candidates[cid] = [*fresh.values(), *kept]
+                notes.extend(comp_notes)
         store.update_snapshot(state["run_id"], candidates=candidates,
                               research_notes=[*state.get("research_notes", []), *notes])
         return {"candidates": candidates, "research_notes": notes}
