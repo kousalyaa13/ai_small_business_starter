@@ -284,3 +284,23 @@
   .compare-table thead th:not(:first-child),
   .compare-table tbody td{width:205px;min-width:205px;max-width:205px}
 }
+
+/* Full-width comparison with a compact live budget strip above the needs. */
+.results-workspace{display:flex;flex-direction:column;gap:16px;align-items:stretch}
+.results-workspace #options.options{order:2;width:100%;min-width:0}
+.results-workspace .selection-summary-top{order:1;position:static;width:100%;z-index:auto}
+.selection-summary-top .selection-bar{
+  display:flex;flex-direction:row;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:14px;padding:14px 20px;box-shadow:none
+}
+.selection-summary-top .selection-bar > div:first-child{flex:1 1 330px;min-width:0}
+.selection-summary-top .selection-bar strong{
+  display:inline-block;font-size:23px;margin:3px 8px 0 0;overflow-wrap:normal
+}
+.selection-summary-top .selection-bar p{margin-top:5px;max-width:650px}
+.selection-summary-top .selection-actions{display:flex;width:auto;flex:0 0 auto;align-items:center}
+.selection-summary-top #save-selection{width:auto;min-width:165px}
+@media(max-width:650px){
+ .selection-summary-top .selection-bar{align-items:stretch}
+ .selection-summary-top .selection-actions,.selection-summary-top #save-selection{width:100%}
+}
