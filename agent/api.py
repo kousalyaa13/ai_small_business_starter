@@ -236,7 +236,11 @@ def download_plan_pdf(project_id):
             p("Your personalized setup checklist is still being generated. Download again when it is ready.", "BloomSmall")
     heading("Before purchasing")
     p("Verify pricing, subscription commitments, features, privacy terms, and integrations directly with each vendor. BloomBots does not purchase, install, or connect software for you.")
-    doc.build(story)
+    try:
+        doc.build(story)
+    except Exception:
+        current_app.logger.exception("PDF generation failed for project %s", project_id)
+        return jsonify({"error": "PDF generation failed. Check the Flask server logs for details."}), 500
     buffer.seek(0)
     return send_file(buffer, mimetype="application/pdf", as_attachment=True,
                      download_name="BloomBots-Business-Setup-Plan.pdf")
