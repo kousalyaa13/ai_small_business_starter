@@ -86,6 +86,7 @@
     return toolsOf(needById(n.connects[0])).find(t => t.tool_id === chosen[0]) || null;
   };
   const picksKey = () => 'bloom-picks:' + projectId;  // per project: a search's new plan version keeps your picks
+  const savedKey = () => 'bloom-saved-plan:' + projectId;
   const searchKey = () => 'bloom-search:' + projectId;
   const seenKey = () => 'bloom-seen-tools:' + projectId;
   const readJSON = (key, fallback) => { try { return JSON.parse(sessionStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
@@ -105,7 +106,8 @@
   function loadPicks(plan) {
     if (picksPlan === plan.id) return;
     picksPlan = plan.id;
-    const base = readJSON(picksKey(), null) || picksFromOption((plan.options || [])[0]);
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(savedKey())); } catch { return null; } })();
+    const base = readJSON(picksKey(), null) || (saved?.planId === plan.id ? saved.selections : null) || picksFromOption((plan.options || [])[0]);
     picks = {};
     for (const [id, choice] of Object.entries(base)) {
       const need = needById(id);
@@ -162,10 +164,8 @@
   const comparePages = {};
   function compareTools(need, tools, canEdit) {
     if (!tools.length) return '<p class="caption">No tools found for this need yet.</p>';
-    const maxPage = Math.max(0, Math.ceil(tools.length / 3) - 1);
-    const page = Math.min(comparePages[need.id] || 0, maxPage);
-    comparePages[need.id] = page;
-    const shown = tools.slice(page * 3, page * 3 + 3);
+    // Compare every website in one horizontally scrollable table.
+    const shown = tools;
     const status = t => t.fit === 'built_for_this' ? '✓ Designed for this' :
       t.fit === 'workable' ? '◐ With limitations' :
       t.fit === 'poor' ? '— Not designed for this' : '— Not confirmed';
@@ -192,14 +192,12 @@
         '" aria-pressed="' + selected + '">' + (selected ? 'Selected ✓' : 'Select') + '</button>' :
         (selected ? '<strong class="compare-yes">Selected ✓</strong>' : '—');
     };
-    const pages = tools.length > 3 ? '<div class="compare-pagination"><span>' +
-      (page * 3 + 1) + '–' + Math.min((page + 1) * 3, tools.length) + ' of ' + tools.length + ' tools</span>' +
-      '<div><button type="button" class="nav-btn" data-compare-page="-1" ' + (page === 0 ? 'disabled' : '') +
-      ' aria-label="Previous comparison tools">‹</button><button type="button" class="nav-btn" data-compare-page="1" ' +
-      (page === maxPage ? 'disabled' : '') + ' aria-label="Next comparison tools">›</button></div></div>' : '';
+    const pages = tools.length > 3 ?
+      '<div class="compare-pagination"><span>Showing all ' + tools.length +
+      ' tools · Scroll sideways to compare more websites →</span></div>' : '';
     return '<div class="compare-wrap"><div class="compare-intro"><div><span class="mini-label">AT A GLANCE</span>' +
       '<h4>Compare your options</h4></div><span class="caption">Based on available vendor details; verify before purchasing.</span></div>' +
-      '<div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
+      '<div class="compare-scroll" tabindex="0" role="region" aria-label="Scroll horizontally to compare all tools"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
       shown.map(t => {
         const site = official(t.site);
         const name = '<span>' + escape(t.name) + '</span>';
@@ -342,11 +340,7 @@
     else if (!o) message = 'Pricing your selection…';
     else if (searching()) message = 'You can save once the search for “' + researchingNames() +
       '” finishes (about a minute), so the plan includes the latest tools.';
-    else {
-      canSave = true;
-      if (unpriced.length) message = 'Pricing needs verification for ' + [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
-        '. You can still save this plan; confirm those prices on each vendor’s website. They are not included in the estimated subtotal.';
-    }
+    else canSave = true; // Unknown vendor prices do not prevent saving a draft.
     const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
       !['skipped','existing','native','none'].includes(a.source)) || [];
     // Deduplicate products used across multiple needs; the server's total remains authoritative.
@@ -356,14 +350,21 @@
     const totalText = !o ? 'Calculating…' : o.total_is_complete ?
       money(o.monthly_total) + '/month' : money(knownSubtotal) + '/month known';
     const unknownNote = o && !o.total_is_complete ? 'Estimated subtotal only — tools without verified prices are excluded.' : '';
+    const saved = (() => {
+      try { return JSON.parse(localStorage.getItem(savedKey())); }
+      catch { return null; }
+    })();
+    const isSaved = !!saved && saved.planId === data?.plan?.id &&
+      String(saved.planVersion) === String(data?.plan?.version) &&
+      JSON.stringify(saved.selections) === JSON.stringify(picks);
     const quick = '';
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(unknownNote ? unknownNote + ' ' + message : message) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
+      escape(isSaved ? 'Plan saved in this browser. ' + (unknownNote || '') : (unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message))) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
       (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
       '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
-      '>Save this plan →</button></div>' : '') + '</div>';
+      '>' + (isSaved ? 'Saved ✓' : 'Save this plan →') + '</button></div>' : '') + '</div>';
   }
 
   const researchingNames = () => [...researching].map(id => needById(id)?.description || 'this need').join('”, “');
@@ -376,21 +377,8 @@
     byId('options').innerHTML = '<div class="needs-picker">' + needTabs(canEdit) +
       '<section class="need-panel' + (researching.has(activeNeed) ? ' is-searching' : '') + '" id="need-panel" role="tabpanel">' +
       (need ? needPanel(need, canEdit, seen) : '') + '</section></div>';
-    // Keep the live budget visible beside the section heading while comparing tools.
-    const toolbar = document.querySelector('.results-toolbar');
-    if (toolbar) {
-      let summary = byId('selection-summary');
-      if (!summary) {
-        summary = document.createElement('div');
-        summary.id = 'selection-summary';
-        summary.className = 'selection-summary-top';
-        toolbar.appendChild(summary);
-        summary.addEventListener('click', e => {
-          if (e.target.closest('#save-selection')) saveSelection();
-        });
-      }
-      summary.innerHTML = summaryHtml(canEdit);
-    }
+    // The summary is a sticky sibling of the tools, so it remains visible as people compare.
+    drawSummary();
     const track = byId('carousel-track');
     if (track) { track.scrollLeft = trackScroll[activeNeed] || 0; updateCount(); }
     byId('options').querySelector('.need-tab.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
@@ -466,17 +454,24 @@
 
   async function saveSelection() {
     const button = byId('save-selection');
+    if (!button || !preview) return;
     button.disabled = true;
+    const record = {
+      planId: data.plan.id, planVersion: data.plan.version,
+      savedAt: new Date().toISOString(), selections: {...picks},
+      monthlyKnown: preview.monthly_total,
+      totalIsComplete: !!preview.total_is_complete,
+      assignments: preview.assignments.map(a => ({
+        need: a.description, tool: a.tool_name, plan: a.plan_name,
+        monthlyCost: a.monthly_cost, website: a.site_url || null
+      }))
+    };
     try {
-      const r = await fetch('/api/projects/' + encodeURIComponent(projectId) + '/approve', {method:'POST',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify({plan_version: data.plan.version,
-          option_id: 'custom', selections: picks, max_build_budget: Number(byId('build-budget')?.value) || 0,
-          idempotency_key: 'sel-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random())})});
-      const j = await r.json();
-      if (!r.ok && !(r.status === 409 && j.approval)) throw Error(j.error || 'Could not save this plan');
-      setTimeout(poll, 300);
+      localStorage.setItem(savedKey(), JSON.stringify(record));
+      drawSummary();
     } catch (err) {
-      byId('selection-message').textContent = err.message;
+      const message = byId('selection-message');
+      if (message) message.textContent = 'Could not save in this browser. Check that site storage is enabled.';
       button.disabled = false;
     }
   }
@@ -582,6 +577,9 @@
     suggestion = null;
     drawNeeds();
   }
+  byId('selection-summary').addEventListener('click', e => {
+    if (e.target.closest('#save-selection')) saveSelection();
+  });
   byId('options').addEventListener('scroll', e => {
     if (e.target.id !== 'carousel-track') return;
     trackScroll[activeNeed] = e.target.scrollLeft;

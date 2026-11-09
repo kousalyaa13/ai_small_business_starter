@@ -195,12 +195,112 @@
 .comparison-filters .choice-chip { padding:9px 15px; }
 .comparison-filters .choice-chip.selected { background:#f0eafa; border-color:#7543cc; color:#58319b; font-weight:700; }
 
-/* Live budget stays beside the recommendations heading, rather than after every tool. */
-.results-toolbar:has(.selection-summary-top){align-items:flex-start}
-.selection-summary-top{margin-left:auto;width:min(100%,390px);flex:0 1 390px;position:sticky;top:12px;z-index:5}
-.selection-summary-top .selection-bar{margin-top:0;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:13px 16px;box-shadow:0 5px 18px rgba(45,30,70,.06)}
-.selection-summary-top .selection-bar strong{font-size:21px}
-.selection-summary-top .selection-bar p{font-size:12px;line-height:1.45;max-width:none}
-.selection-summary-top .selection-actions{justify-items:stretch}
+/* Live pricing and saving stay visible while comparing tool options. */
+.results-workspace{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 290px;
+  align-items:start;
+  gap:20px;
+  margin-top:20px;
+}
+.results-workspace #options.options{display:block;min-width:0;margin-top:0}
+.results-workspace .needs-picker{min-width:0}
+.selection-summary-top{
+  position:sticky;
+  top:16px;
+  z-index:2;
+  width:100%;
+  min-width:0;
+  align-self:start;
+}
+.selection-summary-top .selection-bar{
+  margin:0;
+  padding:18px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  align-items:stretch;
+  border-color:#e5d9f1;
+  box-shadow:0 8px 22px rgba(65,36,91,.065);
+  border-radius:18px;
+}
+.selection-summary-top .selection-bar strong{
+  font-size:22px;
+  letter-spacing:-.6px;
+  line-height:1.2;
+  display:block;
+  margin:9px 0 4px;
+  overflow-wrap:anywhere;
+}
+.selection-summary-top .selection-bar p{
+  max-width:none;
+  font-size:12px;
+  line-height:1.55;
+  margin-top:10px;
+}
+.selection-summary-top .selection-actions{display:block;width:100%}
 .selection-summary-top #save-selection{width:100%}
-@media(max-width:800px){.selection-summary-top{position:static;flex:1 1 100%;width:100%}}
+@media(max-width:1100px){
+  .results-workspace{grid-template-columns:minmax(0,1fr)}
+  .selection-summary-top{grid-row:1;position:static}
+  .selection-summary-top .selection-bar{max-width:none}
+}
+
+/* All tools in one horizontal comparison: names and attributes stay aligned. */
+.compare-scroll{
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#b49ad7 #f8f4fc;
+}
+.compare-table{
+  width:max-content;
+  min-width:100%;
+  table-layout:fixed;
+}
+.compare-table thead th:first-child,
+.compare-table tbody th{
+  position:sticky;
+  left:0;
+  z-index:2;
+  width:155px;
+  min-width:155px;
+  max-width:155px;
+  background:#faf7ff;
+  box-shadow:2px 0 5px rgba(49,31,70,.07);
+}
+.compare-table thead th:first-child{z-index:3}
+.compare-table thead th:not(:first-child),
+.compare-table tbody td{
+  width:235px;
+  min-width:235px;
+  max-width:235px;
+}
+.compare-table thead th:not(:first-child){white-space:normal}
+.compare-pagination{justify-content:flex-start}
+@media(max-width:700px){
+  .compare-table thead th:first-child,
+  .compare-table tbody th{width:115px;min-width:115px;max-width:115px}
+  .compare-table thead th:not(:first-child),
+  .compare-table tbody td{width:205px;min-width:205px;max-width:205px}
+}
+
+/* Full-width comparison with a compact live budget strip above the needs. */
+.results-workspace{display:flex;flex-direction:column;gap:16px;align-items:stretch}
+.results-workspace #options.options{order:2;width:100%;min-width:0}
+.results-workspace .selection-summary-top{order:1;position:static;width:100%;z-index:auto}
+.selection-summary-top .selection-bar{
+  display:flex;flex-direction:row;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:14px;padding:14px 20px;box-shadow:none
+}
+.selection-summary-top .selection-bar > div:first-child{flex:1 1 330px;min-width:0}
+.selection-summary-top .selection-bar strong{
+  display:inline-block;font-size:23px;margin:3px 8px 0 0;overflow-wrap:normal
+}
+.selection-summary-top .selection-bar p{margin-top:5px;max-width:650px}
+.selection-summary-top .selection-actions{display:flex;width:auto;flex:0 0 auto;align-items:center}
+.selection-summary-top #save-selection{width:auto;min-width:165px}
+@media(max-width:650px){
+ .selection-summary-top .selection-bar{align-items:stretch}
+ .selection-summary-top .selection-actions,.selection-summary-top #save-selection{width:100%}
+}

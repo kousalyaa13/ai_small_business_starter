@@ -34,3 +34,5 @@
 .guide-step ul{margin:6px 0 0;padding-left:22px;font-size:13px;color:#33465f;display:grid;gap:3px}
 .guide-step.done{background:#f6faf8}.guide-step.done .guide-title b,.guide-step.done ul{color:#8993a0;text-decoration:line-through}
 @media(max-width:640px){.flow-detail{grid-template-columns:1fr;gap:2px}}
+.setup-start{margin-top:14px;border:1px solid #c9d6ef;background:#f4f7fe;border-radius:14px;padding:14px 16px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.setup-start p{margin:4px 0 0}.setup-start #setup-start-msg{flex-basis:100%;margin:0}

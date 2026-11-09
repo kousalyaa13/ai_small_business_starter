@@ -295,16 +295,77 @@ $('compare-jump').addEventListener('click',()=>{$('compare-section').open=true;$
 $('flow-before').addEventListener('click',()=>{view='before';renderFlow()});$('flow-after').addEventListener('click',()=>{view='after';renderFlow()});
 ['cost-software','cost-extra','cost-hours','cost-rate','cost-setup'].forEach(id=>$(id).addEventListener('input',calcCost));
 $('preview-btn').addEventListener('click',runPreview);
-$('export-btn').addEventListener('click',()=>{
- if(!report)return;const top=report.tools?.[0];const p=top?.price_estimate;const audit=report.software_audit||{};const r=report.readiness||{};
- const readiness=(r.unanswered||[]).length?'Not checked':r.score+'/100 — '+r.status;
- $('print-area').innerHTML=`<div class="print-meta"><span>BloomBots · Decision Passport</span><h1>${esc(profile.business||'Your business')}</h1><p>${esc(report.blueprint?.goal||'Business improvement plan')} · Created ${new Date().toLocaleDateString()}</p></div>
- <h2>Suggested starting point</h2><p>${esc(top?.name||'Your current software')}: ${esc(priceText(p))}${p?.source_url?' (price checked '+esc(dateText(p.checked_at))+', '+esc(p.source_url)+')':''}. ${esc(top?.description||'')}</p>
- <h2>Your situation</h2><p>Current software: ${esc(profile.software)} · Budget: ${money(Number(profile.budget||0))}/month · Readiness: ${esc(readiness)}</p><p>${esc(audit.try_first||'')}</p>
- <h2>Value estimate (your assumptions)</h2><p>Monthly cost: ${money(costModel.monthly||0)}. Monthly net value: ${money(costModel.net||0)}. First year: ${money(costModel.yearOne||0)}. Estimates, not guaranteed savings.</p>
- <h2>Action plan</h2><ul>${report.steps.map((x,i)=>'<li>'+esc(completed[i]?'Done: ':'Next: ')+esc(x)+'</li>').join('')}</ul>
- <h2>Before purchasing</h2><p>Confirm pricing, features, integrations and privacy terms with the vendor. No vendor accounts are connected.</p>`;
- window.print();
+$('export-btn').addEventListener('click', async () => {
+ if (!report) return;
+ // Open immediately on the click, before asynchronous PDF work, to avoid popup blockers.
+ const tab = window.open('', '_blank');
+ if (!tab) { alert('Please allow pop-ups to open your Decision Passport PDF.'); return; }
+ tab.document.write('<title>Preparing your BloomBots PDF…</title><p style="font:18px system-ui;padding:30px">Preparing your BloomBots Decision Passport…</p>');
+ const top = report.tools?.[0], p = top?.price_estimate;
+ const audit = report.software_audit || {}, readinessData = report.readiness || {};
+ const readiness = (readinessData.unanswered || []).length ? 'Not checked' : readinessData.score + '/100 - ' + readinessData.status;
+ const items = (report.steps || []).map((step,i) => ({text:String(step),done:!!completed[i]}));
+ const loadPdf = () => new Promise((resolve,reject) => {
+   if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
+   const script = document.createElement('script');
+   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+   script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(Error('PDF library unavailable'));
+   script.onerror = () => reject(Error('PDF library unavailable'));
+   document.head.appendChild(script);
+ });
+ try {
+   const jsPDF = await loadPdf();
+   const pdf = new jsPDF({unit:'mm',format:'a4'});
+   const W = 210, margin = 19, contentW = W - 2*margin;
+   let y = 20, page = 1;
+   const purple = [108,65,177], ink = [48,38,66], muted = [93,91,111];
+   const line = (text, size=10, color=ink, weight='normal', indent=0) => {
+     pdf.setFont('helvetica',weight); pdf.setFontSize(size); pdf.setTextColor(...color);
+     const wrapped = pdf.splitTextToSize(String(text||'—'),contentW-indent);
+     const h = size*.43 + 1.4;
+     if (y + wrapped.length*h > 273) { pdf.addPage(); page++; y=20; }
+     pdf.text(wrapped,margin+indent,y); y += wrapped.length*h + 3;
+   };
+   const section = title => {y+=4;line(title,12,purple,'bold');pdf.setDrawColor(225,217,235);pdf.line(margin,y-1,W-margin,y-1);y+=3};
+   const field = (label,value) => {line(label.toUpperCase(),8,muted,'bold');line(value,10,ink)};
+   pdf.setFillColor(249,245,254);pdf.rect(0,0,W,51,'F');
+   line('BloomBots  /  DECISION PASSPORT',10,purple,'bold');
+   line(profile.business||'Your business',21,ink,'bold');
+   line((report.blueprint?.goal||'Your business improvement plan')+'  |  '+new Date().toLocaleDateString(),9,muted);
+   y=61;
+   section('01  Your recommended starting point');
+   field('Suggested tool',top?.name||'Your current software');
+   line((priceText(p)||'Price to verify')+(top?.description?'  -  '+top.description:''),10);
+   if(p?.source_url) line('Verify current pricing: '+p.source_url,8,muted);
+   section('02  Your business at a glance');
+   field('Current software',profile.software||'Not specified');
+   field('Monthly budget',money(Number(profile.budget||0)));
+   field('Readiness',readiness);
+   if(audit.try_first) line(audit.try_first,9,muted);
+   section('03  Your value estimate');
+   line('Estimated monthly cost: '+money(costModel.monthly||0),10);
+   line('Estimated monthly net value: '+money(costModel.net||0),10);
+   line('Estimated first-year value: '+money(costModel.yearOne||0),10);
+   line('These are estimates based on your assumptions, not guaranteed savings.',8,muted);
+   section('04  Your next steps  /  checklist');
+   if(!items.length) line('No action steps have been generated yet.',10,muted);
+   for(const item of items){
+     if(y>266){pdf.addPage();page++;y=20}
+     pdf.setDrawColor(...purple);pdf.setLineWidth(.35);pdf.rect(margin,y-3,4,4);
+     if(item.done){pdf.line(margin+.6,y-1,margin+1.7,y);pdf.line(margin+1.7,y,margin+3.5,y-2.3)}
+     line(item.text+(item.done?' (completed)':''),10,item.done?muted:ink,'normal',8);
+   }
+   section('05  Before you purchase');
+   line('Confirm current pricing, features, integrations, and privacy terms directly with the vendor. BloomBots does not purchase or install software.',9,muted);
+   const pages=pdf.getNumberOfPages();
+   for(let i=1;i<=pages;i++){pdf.setPage(i);pdf.setFontSize(8);pdf.setTextColor(...muted);pdf.text('BloomBots  |  Your decisions, ready to grow',margin,287);pdf.text(i+' / '+pages,W-margin,287,{align:'right'})}
+   const url = URL.createObjectURL(pdf.output('blob'));
+   tab.location.replace(url);
+   setTimeout(()=>URL.revokeObjectURL(url),120000);
+ } catch(error) {
+   tab.document.body.innerHTML = '<p style="font:16px system-ui;padding:30px">Could not generate the PDF. Please return to BloomBots and try again.</p>';
+   console.error('Decision Passport PDF error',error);
+ }
 });
 $('csv-form').addEventListener('submit',async event=>{
  event.preventDefault();const el=$('csv-result');note(el,'Analyzing sample data…');

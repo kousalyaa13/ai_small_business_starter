@@ -43,12 +43,57 @@
     }
   }
 
+  // ---- From a saved draft to a setup guide -----------------------------------------------------
+  // "Save this plan" keeps a draft in the browser that the owner can keep adjusting. Building the setup
+  // guide finalizes that selection on the server, so it is a separate, explicit step.
+  const draft = () => { try { return JSON.parse(localStorage.getItem('bloom-saved-plan:' + projectId)); } catch { return null; } };
+  const sameSelection = (a, b) => JSON.stringify(Object.entries(a || {}).sort()) === JSON.stringify(Object.entries(b || {}).sort());
+  function renderStart() {
+    let box = byId('setup-start');
+    if (!box) {
+      box = document.createElement('section');
+      box.id = 'setup-start';
+      box.className = 'setup-start';
+      (byId('connection-check') || byId('options')).insertAdjacentElement('afterend', box);
+    }
+    const saved = draft();
+    const current = typeof root.bloomPicks === 'function' ? root.bloomPicks() : {};
+    const ready = !data?.approval && data?.plan && saved && saved.planId === data.plan.id && sameSelection(saved.selections, current);
+    box.hidden = !ready;
+    if (!ready) return;
+    box.innerHTML = '<div><b>Ready to set it up?</b><p class="caption">We’ll work out how your tools connect and write ' +
+      'a step-by-step setup guide. This finalizes your saved selection.</p></div>' +
+      '<button type="button" class="btn blue" id="setup-start-btn">Build my setup guide →</button>' +
+      '<p class="caption" id="setup-start-msg" role="status"></p>';
+    byId('setup-start-btn').onclick = async () => {
+      const button = byId('setup-start-btn'), msg = byId('setup-start-msg');
+      button.disabled = true;
+      msg.textContent = 'Starting…';
+      try {
+        const r = await fetch('/api/projects/' + encodeURIComponent(projectId) + '/approve', {method: 'POST',
+          headers: {'Content-Type': 'application/json'}, body: JSON.stringify({plan_version: data.plan.version,
+            option_id: 'custom', selections: current, max_build_budget: Number(byId('build-budget')?.value) || 0,
+            idempotency_key: 'setup-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random())})});
+        const j = await r.json();
+        if (!r.ok && !(r.status === 409 && j.approval)) throw Error(j.error || 'Could not start your setup guide');
+        setTimeout(poll, 400);
+      } catch (err) {
+        msg.textContent = err.message;
+        button.disabled = false;
+      }
+    };
+  }
+  // A save or a changed pick redraws the selection bar; re-check whether the guide can be started.
+  document.addEventListener('bloom:picks', () => setTimeout(renderStart, 0));
+  document.addEventListener('click', e => { if (e.target.closest('#save-selection')) setTimeout(renderStart, 50); });
+
   // ---- After saving: the setup plan ------------------------------------------------------------
   const originalRenderPlan = renderPlan;
   renderPlan = function () {
     originalRenderPlan();
     const check = byId('connection-check');
     if (check && data?.approval) check.hidden = true;
+    renderStart();
     renderSetup();
   };
 
