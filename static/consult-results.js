@@ -53,11 +53,15 @@
     return '';
   }
   function sourceChecks(tool) {
+    // A recorded HTTPS URL is evidence of a source link, not a live site or security audit.
     const https = value => /^https:\/\//i.test(value || '');
+    const hasVendorLink = https(tool.site);
+    const hasPricingLink = https(tool.pricing_source_url);
     return {
       status: tool.vetted ? 'Catalog listing reviewed' : 'Web-discovered; not independently reviewed',
-      hasVendorLink: https(tool.site),
-      hasPricingLink: https(tool.pricing_source_url),
+      hasVendorLink,
+      hasPricingLink,
+      linkCount: Number(hasVendorLink) + Number(hasPricingLink),
       priceShown: tool.monthly_cost != null,
       checkedAt: tool.pricing_checked_at || ''
     };
@@ -141,15 +145,19 @@
     const reviews = 'https://www.g2.com/search?query=' + encodeURIComponent(t.name || '');
     const link = (href, label) => '<a href="' + escape(href) +
       '" target="_blank" rel="noopener noreferrer">' + label + ' ↗</a>';
+    const summary = checks.linkCount === 2 ?
+      'Basic source screening: 2/2 HTTPS links recorded' :
+      'Basic source screening: ' + checks.linkCount + '/2 HTTPS links recorded';
     return '<details class="trust-disclosure"><summary>' + trustTag(t) +
       '<span class="trust-open">View evidence</span></summary><div class="trust-evidence">' +
+      '<p class="trust-result"><b>' + summary + '</b></p>' +
       '<p><b>Vendor website:</b> ' + (site ? link(site, 'View vendor site') : 'No source link recorded') + '</p>' +
       '<p><b>Pricing:</b> ' + (pricing ? link(pricing, 'View pricing source') +
         (checks.checkedAt ? ' · Checked ' + escape(checks.checkedAt) : '') +
         (checks.priceShown ? '' : ' · Plan price unconfirmed') : 'No pricing source recorded') + '</p>' +
       '<p><b>Independent reviews:</b> Not assessed · ' + link(reviews, 'Search G2') + '</p>' +
-      '<p><b>Privacy &amp; security:</b> Not independently assessed.</p>' +
-      '<p class="trust-caution">A source link is not a safety certification. Check privacy, data handling and terms before sharing business or customer data.</p>' +
+      '<p><b>Security assessment:</b> Demo preview — independent review not yet implemented.</p>' +
+      '<p class="trust-caution">These checks confirm source links are recorded, not that a vendor is safe. Review privacy, data handling and terms before sharing customer data.</p>' +
       '</div></details>';
   }
   const FIT = {built_for_this: ['fit-good', 'Built for this'], workable: ['fit-ok', 'Works, with limits'],
