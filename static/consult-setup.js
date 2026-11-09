@@ -43,11 +43,11 @@
     }
   }
 
-  // ---- From a saved draft to a setup guide -----------------------------------------------------
-  // "Save this plan" keeps a draft in the browser that the owner can keep adjusting. Building the setup
-  // guide finalizes that selection on the server, so it is a separate, explicit step.
-  const draft = () => { try { return JSON.parse(localStorage.getItem('bloom-saved-plan:' + projectId)); } catch { return null; } };
-  const sameSelection = (a, b) => JSON.stringify(Object.entries(a || {}).sort()) === JSON.stringify(Object.entries(b || {}).sort());
+  // ---- From the owner's picks to a setup guide --------------------------------------------------
+  // Once every need has a choice (a tool, "I already have this" or "Skip"), the owner can build the setup
+  // guide. That finalizes the selection on the server; the plan PDF download stays separate.
+  const allChosen = picks => (data?.components || []).every(c =>
+    picks[c.id] || (c.capability === 'workflow_automation' && (c.connects || []).length >= 2));
   function renderStart() {
     let box = byId('setup-start');
     if (!box) {
@@ -56,13 +56,13 @@
       box.className = 'setup-start';
       (byId('connection-check') || byId('options')).insertAdjacentElement('afterend', box);
     }
-    const saved = draft();
     const current = typeof root.bloomPicks === 'function' ? root.bloomPicks() : {};
-    const ready = !data?.approval && data?.plan && saved && saved.planId === data.plan.id && sameSelection(saved.selections, current);
+    const ready = !data?.approval && !!data?.plan && allChosen(current) &&
+      (data.run?.status === 'waiting_approval' || data.run?.step === 'no_complete_option');
     box.hidden = !ready;
     if (!ready) return;
     box.innerHTML = '<div><b>Ready to set it up?</b><p class="caption">We’ll work out how your tools connect and write ' +
-      'a step-by-step setup guide. This finalizes your saved selection.</p></div>' +
+      'a step-by-step setup guide. This finalizes your current choices.</p></div>' +
       '<button type="button" class="btn blue" id="setup-start-btn">Build my setup guide →</button>' +
       '<p class="caption" id="setup-start-msg" role="status"></p>';
     byId('setup-start-btn').onclick = async () => {
@@ -83,9 +83,8 @@
       }
     };
   }
-  // A save or a changed pick redraws the selection bar; re-check whether the guide can be started.
+  // A changed pick may complete (or un-complete) the selection; re-check whether the guide can be started.
   document.addEventListener('bloom:picks', () => setTimeout(renderStart, 0));
-  document.addEventListener('click', e => { if (e.target.closest('#save-selection')) setTimeout(renderStart, 50); });
 
   // ---- After saving: the setup plan ------------------------------------------------------------
   const originalRenderPlan = renderPlan;

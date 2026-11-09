@@ -26,6 +26,9 @@ class ConsultationLayoutTests(unittest.TestCase):
         setup_js = (ROOT / "static" / "consult-setup.js").read_text()
         self.assertIn("Build my setup guide", setup_js)  # a saved draft leads to the setup guide
         self.assertIn("/approve", setup_js)
+        # The guide no longer depends on a browser draft (Save now downloads a PDF).
+        self.assertNotIn("bloom-saved-plan", setup_js)
+        self.assertIn("allChosen", setup_js)
         # Pricing-only questions (contacts, automated tasks, seats) were removed: they never change which tools fit.
         self.assertNotIn("pricing-questions", ids)
 
