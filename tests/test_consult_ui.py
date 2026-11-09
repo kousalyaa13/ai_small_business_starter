@@ -12,7 +12,7 @@ class ConsultationLayoutTests(unittest.TestCase):
         ids = re.findall(r'\bid="([^"]+)"', html)
         self.assertEqual(len(ids), len(set(ids)), "Duplicate HTML IDs")
         for expected in ("consultation-card", "needs-details", "options",
-                         "adjust-toggle", "recovery-panel",
+                         "fit-card", "recovery-panel",
                          "approve-line", "build-budget", "selection-note"):
             self.assertIn(expected, ids)
         # The compare tab was removed: it repeated what the needs picker already shows.
