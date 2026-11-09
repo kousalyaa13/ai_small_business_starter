@@ -304,3 +304,8 @@
  .selection-summary-top .selection-bar{align-items:stretch}
  .selection-summary-top .selection-actions,.selection-summary-top #save-selection{width:100%}
 }
+
+/* Download action in the approved decision card */
+.approved-download{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:18px}
+.approved-download .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;min-height:44px}
+.approved-download .caption{max-width:420px}
