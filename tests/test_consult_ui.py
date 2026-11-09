@@ -38,9 +38,11 @@ class ConsultationLayoutTests(unittest.TestCase):
         self.assertIn("row('Trust & sources', trustEvidence", js)
         self.assertIn("sourceChecks(t)", js)
         self.assertIn("View pricing source", js)
-        self.assertIn("Not independently assessed", js)
+        self.assertIn("Basic source screening:", js)
+        self.assertIn("2 HTTPS links recorded", js)
+        self.assertIn("Demo preview — independent review not yet implemented", js)
         self.assertIn("Search G2", js)
-        self.assertIn("not a safety certification", js)
+        self.assertIn("not that a vendor is safe", js)
         self.assertIn(".trust-disclosure", css)
 
     def test_results_load_before_recovery_wrapper(self):
