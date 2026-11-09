@@ -34,12 +34,12 @@
   function renderRecovery() {
     const panel = $('recovery-panel');
     const plan = data && data.plan;
-    const recovery = data && data.recovery;
+    const recovery = data?.recovery || {total_people: Number(data?.intake?.seats) || 1, editors: null, budget: data?.intake?.monthly_budget ?? null, suggestions: [], plans: [], disclaimer: ''};
     const approved = data && data.approval;
     const usable = !!(plan?.options || []).some(o => o.total_is_complete &&
       (o.assignments || []).every(a => a.source !== 'none'));
     const noneFound = !usable;
-    panel.hidden = !plan || !recovery || !!approved || (usable && !globalThis.bloomRecoveryOpen);
+    panel.hidden = !plan || !!approved;
     panel.classList.toggle('has-matches', usable);
     const fitCard = $('fit-card');
     if (fitCard) fitCard.hidden = panel.hidden;
@@ -88,8 +88,7 @@
   }
 
   function updatePriceExplorer() {
-    const recovery = data && data.recovery;
-    if (!recovery) return;
+    const recovery = data?.recovery || {total_people: Number(data?.intake?.seats) || 1, editors: null, plans: [], disclaimer: ''};
     const total = Math.max(1, Number(recovery.total_people) || 1);
     const editors = Math.max(1, Math.min(total, Number($('editor-slider').value) || total));
     const viewers = total - editors;
