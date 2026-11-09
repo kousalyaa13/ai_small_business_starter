@@ -354,6 +354,13 @@
     const totalText = !o ? 'Calculating…' : o.total_is_complete ?
       money(o.monthly_total) + '/month' : money(knownSubtotal) + '/month known';
     const unknownNote = o && !o.total_is_complete ? 'Estimated subtotal only — tools without verified prices are excluded.' : '';
+    const saved = (() => {
+      try { return JSON.parse(localStorage.getItem(savedKey())); }
+      catch { return null; }
+    })();
+    const isSaved = !!saved && saved.planId === data?.plan?.id &&
+      String(saved.planVersion) === String(data?.plan?.version) &&
+      JSON.stringify(saved.selections) === JSON.stringify(picks);
     const quick = '';
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
@@ -374,21 +381,8 @@
     byId('options').innerHTML = '<div class="needs-picker">' + needTabs(canEdit) +
       '<section class="need-panel' + (researching.has(activeNeed) ? ' is-searching' : '') + '" id="need-panel" role="tabpanel">' +
       (need ? needPanel(need, canEdit, seen) : '') + '</section></div>';
-    // Keep the live budget visible beside the section heading while comparing tools.
-    const toolbar = document.querySelector('.results-toolbar');
-    if (toolbar) {
-      let summary = byId('selection-summary');
-      if (!summary) {
-        summary = document.createElement('div');
-        summary.id = 'selection-summary';
-        summary.className = 'selection-summary-top';
-        toolbar.appendChild(summary);
-        summary.addEventListener('click', e => {
-          if (e.target.closest('#save-selection')) saveSelection();
-        });
-      }
-      summary.innerHTML = summaryHtml(canEdit);
-    }
+    // The summary is a sticky sibling of the tools, so it remains visible as people compare.
+    drawSummary();
     const track = byId('carousel-track');
     if (track) { track.scrollLeft = trackScroll[activeNeed] || 0; updateCount(); }
     byId('options').querySelector('.need-tab.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
@@ -582,6 +576,9 @@
     suggestion = null;
     drawNeeds();
   }
+  byId('selection-summary').addEventListener('click', e => {
+    if (e.target.closest('#save-selection')) saveSelection();
+  });
   byId('options').addEventListener('scroll', e => {
     if (e.target.id !== 'carousel-track') return;
     trackScroll[activeNeed] = e.target.scrollLeft;
