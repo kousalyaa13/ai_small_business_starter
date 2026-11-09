@@ -358,7 +358,7 @@
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(unknownNote ? unknownNote + ' ' + message : message) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
+      escape(unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message)) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
       (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
       '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
       '>Save this plan →</button></div>' : '') + '</div>';
