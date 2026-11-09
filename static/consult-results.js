@@ -457,74 +457,83 @@
     tab.document.body.innerHTML = '<p style="font:18px system-ui;padding:24px">Preparing your Decision Passport PDF…</p>';
     button.disabled = true;
     try {
-      const jsPDF = await new Promise((resolve, reject) => {
-        if (window.jspdf?.jsPDF) return resolve(window.jspdf.jsPDF);
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
-        script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(Error('PDF library unavailable'));
-        script.onerror = () => reject(Error('PDF library unavailable'));
-        document.head.appendChild(script);
-      });
-      const pdf = new jsPDF({unit:'mm',format:'a4'});
-      const purple = [113,65,190], ink = [48,38,65], muted = [102,91,115];
-      let y = 22;
-      const pageWidth = 210, margin = 18, maxWidth = pageWidth - margin*2;
-      function write(value, size=10, bold=false, color=ink, indent=0) {
-        pdf.setFont('helvetica',bold?'bold':'normal');
-        pdf.setFontSize(size); pdf.setTextColor(...color);
-        const lines = pdf.splitTextToSize(String(value ?? '—'), maxWidth-indent);
-        const lineHeight = size*0.48;
-        if (y + lines.length*lineHeight > 270) { pdf.addPage(); y=20; }
-        pdf.text(lines,margin+indent,y);
-        y += lines.length*lineHeight + 3;
-      }
-      function heading(value) { y+=4; write(value,13,true,purple); }
-      pdf.setFillColor(249,245,254); pdf.rect(0,0,210,42,'F');
-      write('BloomBots  |  Decision Passport',20,true,purple);
-      write('Your selected business tools and next steps',10,false,muted);
-      y=49;
-      const intake = data?.intake || {};
-      const budget = intake.monthly_budget;
-      if (budget != null && budget !== '') write('Monthly budget: $'+Number(budget).toFixed(2),10,true);
-      const assignments = preview.assignments || [];
+      const jsPDF = await (async () => {
+        if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+        const sources = [
+          'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
+          'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
+          'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js'
+        ];
+        for (const src of sources) {
+          try {
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = src;
+              script.onload = resolve;
+              script.onerror = () => reject(new Error('Unable to load PDF library from ' + src));
+              document.head.appendChild(script);
+            });
+            if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
+          } catch (err) {
+      console.error('Decision Passport PDF error', err);
+      // A browser-native print view is available even when PDF CDNs are blocked.
+      // The user can choose "Save as PDF" in their browser's print dialog.
+      const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+      })[c]);
+      const items = preview.assignments || [];
       const unique = new Map();
-      for (const a of assignments) {
+      for (const a of items) {
         const key = a.tool_id || a.tool_name || a.description;
-        if (!unique.has(key)) unique.set(key,a);
+        if (!unique.has(key)) unique.set(key, a);
       }
-      const known = [...unique.values()].filter(a=>a.monthly_cost != null).reduce((sum,a)=>sum+Number(a.monthly_cost),0);
-      const hasUnknown = [...unique.values()].some(a=>a.monthly_cost == null && !['skipped','existing','native','none'].includes(a.source));
-      write('Known monthly subtotal: $'+known.toFixed(2)+(hasUnknown?' (excludes unverified prices)':''),11,true);
-      heading('Your business needs and selected tools');
-      for (const a of assignments) {
-        write(a.description || 'Business need',10,true);
-        write('Selected: '+(a.tool_name || (a.source==='skipped'?'Skipped':a.source==='existing'?'Already handled':'Not selected'))+
-          (a.plan_name?' · '+a.plan_name:'')+
-          (a.monthly_cost != null?' · $'+Number(a.monthly_cost).toFixed(2)+'/month':' · Price to verify'),9,false,muted,3);
-        if (a.site_url) write('Website: '+a.site_url,8,false,purple,3);
-      }
-      heading('Next steps checklist');
+      const known = [...unique.values()].filter(a => a.monthly_cost != null)
+        .reduce((sum, a) => sum + Number(a.monthly_cost), 0);
+      const incomplete = [...unique.values()].some(a => a.monthly_cost == null &&
+        !['skipped','existing','native','none'].includes(a.source));
       const steps = [
-        'Confirm current pricing, billing terms, and any extra fees on vendor websites.',
-        'Verify that each selected plan supports your required features and team size.',
-        'Check integrations and data-sharing requirements between selected tools.',
-        'Test the tools with a small pilot before committing to paid subscriptions.',
-        'Review the results and decide whether to proceed.'
+        'Confirm current prices, billing terms, and extra fees with each vendor.',
+        'Verify required features, integrations, and team access.',
+        'Configure your selected tools and connect supported workflows.',
+        'Test the full workflow with a small pilot.',
+        'Review results and decide whether to roll out.'
       ];
-      for (const step of steps) {
-        if (y>264) {pdf.addPage();y=20;}
-        pdf.setDrawColor(...purple);pdf.rect(margin,y-3,3.5,3.5);
-        write(step,9,false,ink,7);
+      const rows = items.map(a => '<section><h3>' + safe(a.description || 'Business need') +
+        '</h3><p><b>' + safe(a.tool_name || (a.source === 'skipped' ? 'Skipped' :
+        a.source === 'existing' ? 'Already handled' : 'Not selected')) + '</b>' +
+        (a.plan_name ? ' · ' + safe(a.plan_name) : '') + ' · ' +
+        (a.monthly_cost != null ? '$' + Number(a.monthly_cost).toFixed(2) + '/month' : 'Price to verify') +
+        '</p>' + (a.site_url && /^https?:\/\//i.test(a.site_url) ?
+          '<p><a href="' + safe(a.site_url) + '" target="_blank" rel="noopener noreferrer">' +
+          safe(a.site_url) + '</a></p>' : '') + '</section>').join('');
+      const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+        '<title>BloomBots Decision Passport</title><style>' +
+        'body{font:15px/1.55 Arial,sans-serif;color:#302641;max-width:780px;margin:40px auto;padding:0 28px}' +
+        'header{border-bottom:3px solid #7945c5;padding-bottom:18px}h1{color:#7945c5;font-size:28px}' +
+        'h2{font-size:19px;margin-top:28px;color:#7945c5}h3{font-size:15px;margin-bottom:3px}' +
+        'section{border-bottom:1px solid #e8e2f0;padding:8px 0;break-inside:avoid}section p{margin:4px 0}' +
+        'a{color:#6740b1;overflow-wrap:anywhere}.summary{background:#f7f2ff;padding:16px;border-radius:12px}' +
+        'li{padding:5px 0}button{background:#7945c5;color:white;border:0;border-radius:8px;padding:12px 18px;font-weight:bold;cursor:pointer}' +
+        '.toolbar{position:sticky;top:0;background:white;padding:14px 0;border-bottom:1px solid #ddd}' +
+        '@media print{.toolbar{display:none}body{margin:12mm auto;padding:0}a{color:#302641}}' +
+        '</style></head><body><div class="toolbar"><button onclick="window.print()">Save as PDF / Print</button>' +
+        ' <span>In the print dialog, select “Save as PDF”.</span></div>' +
+        '<header><h1>BloomBots · Decision Passport</h1><p>Your selected business tools and implementation checklist</p></header>' +
+        '<div class="summary"><b>Known monthly subtotal: $' + known.toFixed(2) + '</b>' +
+        (incomplete ? '<p>Estimated subtotal only — tools without verified prices are excluded.</p>' : '') +
+        '</div><h2>Your selections</h2>' + rows + '<h2>Next steps</h2><ol>' +
+        steps.map(x => '<li>☐ ' + safe(x) + '</li>').join('') +
+        '</ol><p><small>Verify vendor pricing and capabilities before purchasing. BloomBots does not purchase or install software.</small></p>' +
+        '</body></html>';
+      try {
+        tab.document.open();
+        tab.document.write(html);
+        tab.document.close();
+      } catch (fallbackErr) {
+        console.error('Decision Passport print fallback error', fallbackErr);
+        const message = byId('selection-message');
+        if (message) message.textContent = 'Could not open the PDF. Please allow pop-ups and try again.';
       }
-      y+=4;write('Estimates are based on available vendor details. BloomBots does not purchase or install software.',8,false,muted);
-      const pages=pdf.getNumberOfPages();
-      for(let p=1;p<=pages;p++){pdf.setPage(p);pdf.setFontSize(8);pdf.setTextColor(...muted);pdf.text('BloomBots Decision Passport',margin,286);pdf.text(p+' / '+pages,192,286,{align:'right'});}
-      const url = URL.createObjectURL(pdf.output('blob'));
-      tab.location.replace(url);
-      // The new tab owns the blob URL for this browsing session.
-    } catch (err) {
-      tab.document.body.innerHTML = '<p style="font:16px system-ui;padding:24px">Unable to create the PDF. Please return to BloomBots and try again.</p>';
-      console.error('Decision Passport PDF error',err);
     } finally {
       button.disabled = false;
     }
