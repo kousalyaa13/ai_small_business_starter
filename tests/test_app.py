@@ -89,7 +89,9 @@ class AppTests(unittest.TestCase):
     def test_dashboard_discloses_evidence_without_inventing_ratings(self):
         page = self.client.get('/dashboard').get_data(as_text=True)
         self.assertIn('Trust &amp; sources', page)
-        self.assertIn('Not independently assessed', page)
+        self.assertIn('Basic source screening:', page)
+        self.assertIn('sourceLinkCount(t)', page)
+        self.assertIn('Demo preview — independent review not yet implemented', page)
         self.assertIn('Search G2', page)
         self.assertNotIn('Customer reviews on G2 ↗', page)
         result = self.client.post('/api/recommend', json={
