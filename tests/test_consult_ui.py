@@ -32,6 +32,17 @@ class ConsultationLayoutTests(unittest.TestCase):
         # Pricing-only questions (contacts, automated tasks, seats) were removed: they never change which tools fit.
         self.assertNotIn("pricing-questions", ids)
 
+    def test_source_evidence_is_available_without_security_claims(self):
+        js = (ROOT / "static" / "consult-results.js").read_text()
+        css = (ROOT / "static" / "consult-results.css").read_text()
+        self.assertIn("row('Trust & sources', trustEvidence", js)
+        self.assertIn("sourceChecks(t)", js)
+        self.assertIn("View pricing source", js)
+        self.assertIn("Not independently assessed", js)
+        self.assertIn("Search G2", js)
+        self.assertIn("not a safety certification", js)
+        self.assertIn(".trust-disclosure", css)
+
     def test_results_load_before_recovery_wrapper(self):
         html = (ROOT / "templates" / "consult.html").read_text()
         self.assertLess(html.index("consult-results.js"), html.index("consult-recovery.js"))
