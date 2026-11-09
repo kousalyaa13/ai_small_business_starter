@@ -5,6 +5,7 @@
 <title>BloomBots — Your personalized solution</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-recovery.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='consult-results.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='consult-setup.css') }}">
 <style>
 :root{--ink:#342445;--muted:#675c76;--line:#e8e0ee;--page:#fcf8ff;--blue:#7546c8;--teal:#7e4eaa;--amber:#a86b25;--violet:#8752b4;--red:#a62f42}
 *{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.52 system-ui,-apple-system,Segoe UI,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:var(--blue)}
@@ -108,6 +109,7 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
     
    </div>
      <div class="options" id="options"></div>
+     <section class="connection-check" id="connection-check" aria-live="polite" hidden></section>
      <p class="selection-note" id="selection-note">Choosing a tool saves your decision here. BloomBot does not purchase or install software.</p>
      <details id="approve-line" class="setup-budget-control"><summary>Optional: set a one-time setup budget</summary>
       <label class="field" style="max-width:280px">Maximum one-time setup budget ($)<input id="build-budget" type="number" min="0" value="0"></label>
@@ -142,6 +144,7 @@ input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{
      </div>
   </section>
 
+  <section class="card setup-plan" id="setup-plan" aria-live="polite" hidden></section>
   <div class="card approved" id="approved" hidden>
    <span class="eyebrow" style="color:var(--teal)">Saved decision</span>
    <h2 id="approved-title"></h2>
@@ -284,5 +287,6 @@ if(projectId)show();
 </script>
 <script src="{{ url_for('static', filename='consult-results.js') }}"></script>
 <script src="{{ url_for('static', filename='consult-recovery.js') }}"></script>
+<script src="{{ url_for('static', filename='consult-setup.js') }}"></script>
 </body>
 </html>

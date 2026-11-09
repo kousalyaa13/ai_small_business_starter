@@ -12,13 +12,19 @@ class ConsultationLayoutTests(unittest.TestCase):
         ids = re.findall(r'\bid="([^"]+)"', html)
         self.assertEqual(len(ids), len(set(ids)), "Duplicate HTML IDs")
         for expected in ("consultation-card", "needs-details", "options",
-                         "adjust-toggle", "recovery-panel",
+                         "recovery-panel",
                          "approve-line", "build-budget", "selection-note"):
             self.assertIn(expected, ids)
         # The compare tab was removed: it repeated what the needs picker already shows.
         self.assertNotIn("compare-view", ids)
         self.assertNotIn("compare-toggle", ids)
         self.assertNotIn("research-all", ids)  # searches run per need, never for everything at once
+        # After the owner chooses: the connection check and the setup plan.
+        self.assertIn("connection-check", ids)
+        self.assertIn("setup-plan", ids)
+        js = (ROOT / "static" / "consult-results.js").read_text()
+        self.assertIn("You can still save this plan", js)  # unlisted prices never block saving
+        self.assertLess(html.index("consult-results.js"), html.index("consult-setup.js"))
         # Pricing-only questions (contacts, automated tasks, seats) were removed: they never change which tools fit.
         self.assertNotIn("pricing-questions", ids)
 

@@ -342,9 +342,11 @@
     else if (!o) message = 'Pricing your selection…';
     else if (searching()) message = 'You can save once the search for “' + researchingNames() +
       '” finishes (about a minute), so the plan includes the latest tools.';
-    else if (unpriced.length) message = 'Pricing needs verification for ' + [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
-      '. Visit each tool’s website to confirm its current price. These costs are not included in the estimated subtotal.';
-    else canSave = true;
+    else {
+      canSave = true;
+      if (unpriced.length) message = 'Pricing needs verification for ' + [...new Set(unpriced.map(a => a.tool_name))].join(', ') +
+        '. You can still save this plan; confirm those prices on each vendor’s website. They are not included in the estimated subtotal.';
+    }
     const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
       !['skipped','existing','native','none'].includes(a.source)) || [];
     // Deduplicate products used across multiple needs; the server's total remains authoritative.
@@ -420,7 +422,11 @@
     writeJSON(picksKey(), picks);
     drawNeeds();
     schedulePreview();
+    announcePicks();
   }
+  // Other scripts (the connection check) listen for the owner's current picks.
+  const announcePicks = () => document.dispatchEvent(new CustomEvent('bloom:picks', {detail: {...picks}}));
+  root.bloomPicks = () => ({...picks});
   function schedulePreview() {
     const key = JSON.stringify(picks);
     if (key === previewKey && preview) return;
@@ -513,6 +519,7 @@
       lastDrawn = signature;
       drawNeeds();
       schedulePreview();
+      announcePicks();
     }
     byId('approve-line').hidden = !editable();
     byId('approved').hidden = !approval;
