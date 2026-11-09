@@ -164,10 +164,8 @@
   const comparePages = {};
   function compareTools(need, tools, canEdit) {
     if (!tools.length) return '<p class="caption">No tools found for this need yet.</p>';
-    const maxPage = Math.max(0, Math.ceil(tools.length / 3) - 1);
-    const page = Math.min(comparePages[need.id] || 0, maxPage);
-    comparePages[need.id] = page;
-    const shown = tools.slice(page * 3, page * 3 + 3);
+    // Compare every website in one horizontally scrollable table.
+    const shown = tools;
     const status = t => t.fit === 'built_for_this' ? '✓ Designed for this' :
       t.fit === 'workable' ? '◐ With limitations' :
       t.fit === 'poor' ? '— Not designed for this' : '— Not confirmed';
@@ -194,14 +192,12 @@
         '" aria-pressed="' + selected + '">' + (selected ? 'Selected ✓' : 'Select') + '</button>' :
         (selected ? '<strong class="compare-yes">Selected ✓</strong>' : '—');
     };
-    const pages = tools.length > 3 ? '<div class="compare-pagination"><span>' +
-      (page * 3 + 1) + '–' + Math.min((page + 1) * 3, tools.length) + ' of ' + tools.length + ' tools</span>' +
-      '<div><button type="button" class="nav-btn" data-compare-page="-1" ' + (page === 0 ? 'disabled' : '') +
-      ' aria-label="Previous comparison tools">‹</button><button type="button" class="nav-btn" data-compare-page="1" ' +
-      (page === maxPage ? 'disabled' : '') + ' aria-label="Next comparison tools">›</button></div></div>' : '';
+    const pages = tools.length > 3 ?
+      '<div class="compare-pagination"><span>Showing all ' + tools.length +
+      ' tools · Scroll sideways to compare more websites →</span></div>' : '';
     return '<div class="compare-wrap"><div class="compare-intro"><div><span class="mini-label">AT A GLANCE</span>' +
       '<h4>Compare your options</h4></div><span class="caption">Based on available vendor details; verify before purchasing.</span></div>' +
-      '<div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
+      '<div class="compare-scroll" tabindex="0" role="region" aria-label="Scroll horizontally to compare all tools"><table class="compare-table"><thead><tr><th scope="col">Compare</th>' +
       shown.map(t => {
         const site = official(t.site);
         const name = '<span>' + escape(t.name) + '</span>';
