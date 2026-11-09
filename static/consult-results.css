@@ -245,3 +245,42 @@
   .selection-summary-top{grid-row:1;position:static}
   .selection-summary-top .selection-bar{max-width:none}
 }
+
+/* All tools in one horizontal comparison: names and attributes stay aligned. */
+.compare-scroll{
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#b49ad7 #f8f4fc;
+}
+.compare-table{
+  width:max-content;
+  min-width:100%;
+  table-layout:fixed;
+}
+.compare-table thead th:first-child,
+.compare-table tbody th{
+  position:sticky;
+  left:0;
+  z-index:2;
+  width:155px;
+  min-width:155px;
+  max-width:155px;
+  background:#faf7ff;
+  box-shadow:2px 0 5px rgba(49,31,70,.07);
+}
+.compare-table thead th:first-child{z-index:3}
+.compare-table thead th:not(:first-child),
+.compare-table tbody td{
+  width:235px;
+  min-width:235px;
+  max-width:235px;
+}
+.compare-table thead th:not(:first-child){white-space:normal}
+.compare-pagination{justify-content:flex-start}
+@media(max-width:700px){
+  .compare-table thead th:first-child,
+  .compare-table tbody th{width:115px;min-width:115px;max-width:115px}
+  .compare-table thead th:not(:first-child),
+  .compare-table tbody td{width:205px;min-width:205px;max-width:205px}
+}
