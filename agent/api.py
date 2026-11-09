@@ -1,7 +1,7 @@
 """Flask routes for the consultation flow."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request, send_file
 from pydantic import ValidationError
 
 from .schemas import Answers, ApprovalRequest, Intake, ResearchRequest, RevisionRequest, SelectionRequest
@@ -136,3 +136,107 @@ def approve(project_id):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"approval": approval, "created": created}), 201 if created else 200
+
+
+@bp.get("/api/projects/<project_id>/plan.pdf")
+def download_plan_pdf(project_id):
+    """Generate a fresh, downloadable PDF from the approved plan and its setup guide."""
+    import io
+    from datetime import date
+    from html import escape
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
+
+    state = service().status(project_id)
+    approval = state.get("approval")
+    if not approval:
+        return jsonify({"error": "Approve your tool selection before downloading the plan."}), 409
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=(612, 792), leftMargin=46, rightMargin=46,
+                            topMargin=48, bottomMargin=48, title="BloomBots Business Setup Plan")
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="BloomTitle", parent=styles["Title"], fontSize=21, leading=26,
+                              textColor=colors.HexColor("#3C2850"), spaceAfter=12))
+    styles.add(ParagraphStyle(name="BloomHeading", parent=styles["Heading2"], fontSize=13,
+                              textColor=colors.HexColor("#7040B7"), spaceBefore=16, spaceAfter=7))
+    styles.add(ParagraphStyle(name="BloomBody", parent=styles["BodyText"], fontSize=9.5,
+                              leading=14, spaceAfter=6, textColor=colors.HexColor("#30415A")))
+    styles.add(ParagraphStyle(name="BloomSmall", parent=styles["BloomBody"], fontSize=8, leading=11))
+    story = []
+    def p(value, style="BloomBody"):
+        story.append(Paragraph(escape(str(value or "")).replace("\\n", "<br/>"), styles[style]))
+    def heading(value):
+        p(value, "BloomHeading")
+    def fmt(value):
+        try:
+            return "${:,.2f}".format(float(value))
+        except (ValueError, TypeError):
+            return "Not verified"
+
+    p("BloomBots | Your business setup plan", "BloomTitle")
+    p("Prepared " + date.today().strftime("%B %d, %Y") + "  •  Keep this guide as your implementation checklist.", "BloomSmall")
+    intake = state.get("intake") or {}
+    if intake.get("problem_text"):
+        heading("Your goal")
+        p(intake["problem_text"])
+    recurring = approval.get("recurring_cost") or {}
+    heading("Your selected tools and budget")
+    p("Estimated known monthly subtotal: " + fmt(recurring.get("monthly_total")) +
+      "   |   One-time setup budget: " + fmt(approval.get("max_build_budget")))
+    p("Estimated subtotal only — tools without verified prices are excluded. Confirm current prices, billing terms, and integrations on official vendor sites.", "BloomSmall")
+    selected = recurring.get("tools") or []
+    if selected:
+        rows = [[Paragraph("<b>Tool</b>", styles["BloomSmall"]),
+                 Paragraph("<b>Decision / need</b>", styles["BloomSmall"])]]
+        for item in selected:
+            rows.append([Paragraph(escape(str(item.get("tool") or "Not specified")), styles["BloomSmall"]),
+                         Paragraph(escape(str(item.get("choice") or item.get("need") or "Selected")), styles["BloomSmall"])])
+        table = Table(rows, colWidths=[175, 345], repeatRows=1, hAlign="LEFT")
+        table.setStyle(TableStyle([("BACKGROUND", (0,0),(-1,0),colors.HexColor("#F0EAF9")),
+            ("VALIGN",(0,0),(-1,-1),"TOP"),("BOTTOMPADDING",(0,0),(-1,-1),9),
+            ("TOPPADDING",(0,0),(-1,-1),8),("LINEBELOW",(0,0),(-1,-1),.4,colors.HexColor("#E5DDF0"))]))
+        story.append(table)
+    setup = state.get("setup") or {}
+    plan = setup.get("plan") or {}
+    workflow = plan.get("workflow") or {}
+    flow_steps = {s.get("id"): s.get("tool") for s in workflow.get("steps", [])}
+    edges = [e for e in workflow.get("edges", []) if e.get("kind") != "manual"]
+    if edges:
+        heading("How your tools connect")
+        for edge in edges:
+            route = edge.get("route") or {}
+            source = flow_steps.get(edge.get("from"), "Source")
+            target = flow_steps.get(edge.get("to"), "Destination")
+            via = " via Zapier" if route.get("route") == "zapier" else ""
+            p(source + " → " + target + via + "  |  " + str(route.get("label") or "Connection"))
+            if edge.get("what_moves"):
+                p(edge["what_moves"], "BloomSmall")
+    guide = plan.get("guide") or []
+    if guide:
+        heading("Your step-by-step setup checklist")
+        completed = set(setup.get("done") or [])
+        for index, step in enumerate(guide, 1):
+            marker = "[X]" if step.get("key") in completed else "[ ]"
+            p(f"{marker} {index}. {step.get('title', 'Setup task')}")
+            if step.get("tool"):
+                p("Tool: " + step["tool"], "BloomSmall")
+            for substep in step.get("substeps") or []:
+                p("    • " + str(substep), "BloomSmall")
+    else:
+        heading("Next steps")
+        for step in ["Confirm official pricing and features for each selected tool.",
+                     "Create your vendor accounts and configure your tools.",
+                     "Test each integration with sample data before going live."]:
+            p("[ ] " + step)
+        if setup.get("status") == "building":
+            p("Your personalized setup checklist is still being generated. Download again when it is ready.", "BloomSmall")
+    heading("Before purchasing")
+    p("Verify pricing, subscription commitments, features, privacy terms, and integrations directly with each vendor. BloomBots does not purchase, install, or connect software for you.")
+    doc.build(story)
+    buffer.seek(0)
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True,
+                     download_name="BloomBots-Business-Setup-Plan.pdf")
