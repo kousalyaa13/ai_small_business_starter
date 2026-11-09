@@ -137,8 +137,6 @@
   // What a tool is good for: the comparison article's note, else its own full description (never cut off in code).
   const pitch = t => t.best_for ? 'Best for ' + t.best_for.replace(/^best for\s+/i, '').replace(/\.$/, '') : (t.description || '');
   const expandedPitch = new Set();      // tools whose full description the owner opened
-  const TOP_TOOLS = 5;                   // tools shown per need before "Show all"
-  const allTools = new Set();            // needs where the owner chose "Show all"
 
   // ---- Horizontal layout: a strip of needs, and a carousel of tool cards for the open need. -----
   const pickedTool = need => toolsOf(need).find(t => t.tool_id === picks[need.id]);
@@ -254,9 +252,8 @@
       }
       return isNew(b) - isNew(a);
     });
-    // Top tools only, unless the owner asks for all; a picked tool is always kept in view.
-    const showAll = allTools.has(need.id) || all.length <= TOP_TOOLS;
-    const tools = showAll ? all : all.filter((t, i) => i < TOP_TOOLS || t.tool_id === picks[need.id]);
+    // Show every matching tool; horizontal comparison handles navigation.
+    const tools = all;
     const share = suggestion && suggestion.from === need.id ? '<div class="share-suggest">' + escape(suggestion.name) +
       ' also covers ' + escape(suggestion.needs.map(id => needById(id)?.description).join(', ')) + '. ' +
       '<button type="button" class="research-btn" data-share="yes">Use ' + escape(suggestion.name) + ' there too</button>' +
@@ -275,15 +272,11 @@
     const plain = (value, label) => canEdit ? '<button type="button" class="choice-chip' +
       (picks[need.id] === value ? ' selected' : '') + '" data-pick="' + value + '" data-need="' + escape(need.id) + '" aria-pressed="' +
       (picks[need.id] === value) + '">' + label + ' · $0</button>' : '';
-    // "Show all" sits outside any one picker style, so it works with the comparison table.
-    const showAllLink = all.length > TOP_TOOLS ? '<button type="button" class="link-btn show-all-btn" data-all="' +
-      escape(need.id) + '">' + (showAll ? 'Show top ' + TOP_TOOLS + ' only' : 'Show all ' + all.length + ' tools') +
-      '</button>' : '';
     const filters = '<div class="comparison-filters"><span class="caption">Sort tools:</span>' +
       [['recommended','Recommended'],['fit','Best fit'],['lowest','Lowest monthly cost']].map(([value,label]) =>
         '<button type="button" class="choice-chip' + (comparisonSort === value ? ' selected' : '') +
         '" data-sort="' + value + '" aria-pressed="' + (comparisonSort === value) + '">' + label + '</button>').join('') +
-      (showAllLink ? '<span class="comparison-show-all">' + showAllLink + '</span>' : '') + '</div>';
+      '</div>';
     return head + searchBanner(need, tools.filter(isNew), current) + share + filters + compareTools(need, tools, canEdit) +
       '<div class="need-panel-foot">' + plain('have', 'I already have this') + plain('skip', 'Skip for now') +
       searchControl(need, canEdit, native) + '</div>';
@@ -563,13 +556,6 @@
     if (step) {
       const list = needs(), i = list.findIndex(n => n.id === activeNeed) + Number(step.dataset.step);
       if (list[i]) openNeed(list[i].id);
-      return;
-    }
-    const showAll = e.target.closest('[data-all]');
-    if (showAll) {
-      const id = showAll.dataset.all;
-      allTools.has(id) ? allTools.delete(id) : allTools.add(id);
-      drawNeeds();
       return;
     }
     const toggle = e.target.closest('[data-more]');
