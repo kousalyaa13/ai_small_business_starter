@@ -333,12 +333,12 @@
     const missing = needs().filter(n => !nativeTool(n) && !picks[n.id]);
     const unpriced = o ? o.assignments.filter(a => a.monthly_cost == null &&
       !['skipped','existing','native','none'].includes(a.source)) : [];
-    let message = '', canSave = false;
+    let message = '';
     if (missing.length) message = 'Choose a tool, “I already have this” or “Skip” for: ' + missing.map(n => n.description).join('; ');
     else if (!o) message = 'Pricing your selection…';
     else if (searching()) message = 'You can save once the search for “' + researchingNames() +
       '” finishes (about a minute), so the plan includes the latest tools.';
-    else canSave = true; // Unknown vendor prices do not prevent saving a draft.
+
     const knownAssignments = o?.assignments?.filter(a => a.monthly_cost != null &&
       !['skipped','existing','native','none'].includes(a.source)) || [];
     // Deduplicate products used across multiple needs; the server's total remains authoritative.
@@ -348,14 +348,10 @@
     const totalText = !o ? 'Calculating…' : o.total_is_complete ?
       money(o.monthly_total) + '/month' : money(knownSubtotal) + '/month known';
     const unknownNote = o && !o.total_is_complete ? 'Estimated subtotal only — tools without verified prices are excluded.' : '';
-    const quick = '';
     return '<div class="selection-bar"><div><div class="mini-label">YOUR SELECTION</div><strong class="' +
       (o ? priceClass(o) : '') + '">' + totalText + '</strong> ' +
       '<span class="caption">' + escape(o ? statusLabel(o) : '') + '</span><p class="caption" id="selection-message">' +
-      escape(unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message)) + '</p></div>' + (canEdit ? '<div class="selection-actions">' +
-      (quick ? '<div class="quick-picks"><span class="caption">Quick picks:</span>' + quick + '</div>' : '') +
-      '<button type="button" class="btn blue" id="save-selection"' + (canSave ? '' : ' disabled') +
-      '>' + 'Download plan PDF ↗' + '</button></div>' : '') + '</div>';
+      escape(unknownNote && unpriced.length && !researching.size ? unknownNote : (unknownNote ? unknownNote + ' ' + message : message)) + '</p></div></div>';
   }
 
   const researchingNames = () => [...researching].map(id => needById(id)?.description || 'this need').join('”, “');
@@ -443,101 +439,6 @@
   }
   root.bloomResearchMore = researchMore;
 
-  async function saveSelection() {
-    const button = byId('save-selection');
-    if (!button || !preview) return;
-    // Open synchronously to avoid pop-up blockers during PDF library loading.
-    const tab = window.open('', '_blank');
-    if (!tab) {
-      const msg = byId('selection-message');
-      if (msg) msg.textContent = 'Please allow pop-ups to open your PDF.';
-      return;
-    }
-    tab.document.title = 'Preparing BloomBots Decision Passport';
-    tab.document.body.innerHTML = '<p style="font:18px system-ui;padding:24px">Preparing your Decision Passport PDF…</p>';
-    button.disabled = true;
-    try {
-      const jsPDF = await (async () => {
-        if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
-        const sources = [
-          'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js',
-          'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
-          'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js'
-        ];
-        for (const src of sources) {
-          try {
-            await new Promise((resolve, reject) => {
-              const script = document.createElement('script');
-              script.src = src;
-              script.onload = resolve;
-              script.onerror = () => reject(new Error('Unable to load PDF library from ' + src));
-              document.head.appendChild(script);
-            });
-            if (window.jspdf?.jsPDF) return window.jspdf.jsPDF;
-          } catch (err) {
-      console.error('Decision Passport PDF error', err);
-      // A browser-native print view is available even when PDF CDNs are blocked.
-      // The user can choose "Save as PDF" in their browser's print dialog.
-      const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({
-        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
-      })[c]);
-      const items = preview.assignments || [];
-      const unique = new Map();
-      for (const a of items) {
-        const key = a.tool_id || a.tool_name || a.description;
-        if (!unique.has(key)) unique.set(key, a);
-      }
-      const known = [...unique.values()].filter(a => a.monthly_cost != null)
-        .reduce((sum, a) => sum + Number(a.monthly_cost), 0);
-      const incomplete = [...unique.values()].some(a => a.monthly_cost == null &&
-        !['skipped','existing','native','none'].includes(a.source));
-      const steps = [
-        'Confirm current prices, billing terms, and extra fees with each vendor.',
-        'Verify required features, integrations, and team access.',
-        'Configure your selected tools and connect supported workflows.',
-        'Test the full workflow with a small pilot.',
-        'Review results and decide whether to roll out.'
-      ];
-      const rows = items.map(a => '<section><h3>' + safe(a.description || 'Business need') +
-        '</h3><p><b>' + safe(a.tool_name || (a.source === 'skipped' ? 'Skipped' :
-        a.source === 'existing' ? 'Already handled' : 'Not selected')) + '</b>' +
-        (a.plan_name ? ' · ' + safe(a.plan_name) : '') + ' · ' +
-        (a.monthly_cost != null ? '$' + Number(a.monthly_cost).toFixed(2) + '/month' : 'Price to verify') +
-        '</p>' + (a.site_url && /^https?:\/\//i.test(a.site_url) ?
-          '<p><a href="' + safe(a.site_url) + '" target="_blank" rel="noopener noreferrer">' +
-          safe(a.site_url) + '</a></p>' : '') + '</section>').join('');
-      const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-        '<title>BloomBots Decision Passport</title><style>' +
-        'body{font:15px/1.55 Arial,sans-serif;color:#302641;max-width:780px;margin:40px auto;padding:0 28px}' +
-        'header{border-bottom:3px solid #7945c5;padding-bottom:18px}h1{color:#7945c5;font-size:28px}' +
-        'h2{font-size:19px;margin-top:28px;color:#7945c5}h3{font-size:15px;margin-bottom:3px}' +
-        'section{border-bottom:1px solid #e8e2f0;padding:8px 0;break-inside:avoid}section p{margin:4px 0}' +
-        'a{color:#6740b1;overflow-wrap:anywhere}.summary{background:#f7f2ff;padding:16px;border-radius:12px}' +
-        'li{padding:5px 0}button{background:#7945c5;color:white;border:0;border-radius:8px;padding:12px 18px;font-weight:bold;cursor:pointer}' +
-        '.toolbar{position:sticky;top:0;background:white;padding:14px 0;border-bottom:1px solid #ddd}' +
-        '@media print{.toolbar{display:none}body{margin:12mm auto;padding:0}a{color:#302641}}' +
-        '</style></head><body><div class="toolbar"><button onclick="window.print()">Save as PDF / Print</button>' +
-        ' <span>In the print dialog, select “Save as PDF”.</span></div>' +
-        '<header><h1>BloomBots · Decision Passport</h1><p>Your selected business tools and implementation checklist</p></header>' +
-        '<div class="summary"><b>Known monthly subtotal: $' + known.toFixed(2) + '</b>' +
-        (incomplete ? '<p>Estimated subtotal only — tools without verified prices are excluded.</p>' : '') +
-        '</div><h2>Your selections</h2>' + rows + '<h2>Next steps</h2><ol>' +
-        steps.map(x => '<li>☐ ' + safe(x) + '</li>').join('') +
-        '</ol><p><small>Verify vendor pricing and capabilities before purchasing. BloomBots does not purchase or install software.</small></p>' +
-        '</body></html>';
-      try {
-        tab.document.open();
-        tab.document.write(html);
-        tab.document.close();
-      } catch (fallbackErr) {
-        console.error('Decision Passport print fallback error', fallbackErr);
-        const message = byId('selection-message');
-        if (message) message.textContent = 'Could not open the PDF. Please allow pop-ups and try again.';
-      }
-    } finally {
-      button.disabled = false;
-    }
-  }
 
   function setResultView() {
     const hasNeeds = needs().length > 0 && !!data?.plan;
@@ -641,7 +542,6 @@
     drawNeeds();
   }
   byId('selection-summary').addEventListener('click', e => {
-    if (e.target.closest('#save-selection')) saveSelection();
   });
   byId('options').addEventListener('scroll', e => {
     if (e.target.id !== 'carousel-track') return;
@@ -714,6 +614,5 @@
     }
     const more = e.target.closest('[data-research]');
     if (more) { researchMore([more.dataset.research]); return; }
-    if (e.target.closest('#save-selection')) saveSelection();
   });
 })(globalThis);
