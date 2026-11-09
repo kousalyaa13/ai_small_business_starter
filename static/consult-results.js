@@ -106,7 +106,8 @@
   function loadPicks(plan) {
     if (picksPlan === plan.id) return;
     picksPlan = plan.id;
-    const base = readJSON(picksKey(), null) || picksFromOption((plan.options || [])[0]);
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(savedKey())); } catch { return null; } })();
+    const base = readJSON(picksKey(), null) || (saved?.planId === plan.id ? saved.selections : null) || picksFromOption((plan.options || [])[0]);
     picks = {};
     for (const [id, choice] of Object.entries(base)) {
       const need = needById(id);
