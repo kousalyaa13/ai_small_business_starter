@@ -52,7 +52,17 @@
     if (/monthly billing/i.test(plan || '')) return 'Billed monthly';
     return '';
   }
-  const api = {groupTools, uniqueTasks, billingLabel};
+  function sourceChecks(tool) {
+    const https = value => /^https:\/\//i.test(value || '');
+    return {
+      status: tool.vetted ? 'Catalog listing reviewed' : 'Web-discovered; not independently reviewed',
+      hasVendorLink: https(tool.site),
+      hasPricingLink: https(tool.pricing_source_url),
+      priceShown: tool.monthly_cost != null,
+      checkedAt: tool.pricing_checked_at || ''
+    };
+  }
+  const api = {groupTools, uniqueTasks, billingLabel, sourceChecks};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -121,10 +131,27 @@
   }
 
   const priceText = t => t.monthly_cost == null ? 'Price not listed' : t.monthly_cost === 0 ? 'Free' : money(t.monthly_cost) + '/mo';
-  // "Reviewed" is about the listing (price and details checked), not about fit for this job.
+  // Catalog review covers the listing, NOT the vendor's privacy, security, or reputation.
   const trustTag = t => t.vetted ?
-    '<span class="trust-label trust-reviewed" title="Our team checked this tool’s price and details. It says nothing about fit for your need.">Reviewed listing</span>' :
-    '<span class="trust-label trust-check" title="Found by web research; confirm details on the vendor’s site.">Unverified</span>';
+    '<span class="trust-label trust-reviewed" title="Curated product listing. Pricing and features may still need confirmation; not a security audit.">Reviewed listing</span>' :
+    '<span class="trust-label trust-check" title="Found through web research, not independently reviewed by our team.">Web-discovered</span>';
+  function trustEvidence(t) {
+    const checks = sourceChecks(t);
+    const site = official(t.site), pricing = official(t.pricing_source_url);
+    const reviews = 'https://www.g2.com/search?query=' + encodeURIComponent(t.name || '');
+    const link = (href, label) => '<a href="' + escape(href) +
+      '" target="_blank" rel="noopener noreferrer">' + label + ' ↗</a>';
+    return '<details class="trust-disclosure"><summary>' + trustTag(t) +
+      '<span class="trust-open">View evidence</span></summary><div class="trust-evidence">' +
+      '<p><b>Vendor website:</b> ' + (site ? link(site, 'View vendor site') : 'No source link recorded') + '</p>' +
+      '<p><b>Pricing:</b> ' + (pricing ? link(pricing, 'View pricing source') +
+        (checks.checkedAt ? ' · Checked ' + escape(checks.checkedAt) : '') +
+        (checks.priceShown ? '' : ' · Plan price unconfirmed') : 'No pricing source recorded') + '</p>' +
+      '<p><b>Independent reviews:</b> Not assessed · ' + link(reviews, 'Search G2') + '</p>' +
+      '<p><b>Privacy &amp; security:</b> Not independently assessed.</p>' +
+      '<p class="trust-caution">A source link is not a safety certification. Check privacy, data handling and terms before sharing business or customer data.</p>' +
+      '</div></details>';
+  }
   const FIT = {built_for_this: ['fit-good', 'Built for this'], workable: ['fit-ok', 'Works, with limits'],
                poor: ['fit-poor', 'Not designed for this']};
   const fitBlock = t => FIT[t.fit] ? '<span class="tool-fit ' + FIT[t.fit][0] + '"><b>' + FIT[t.fit][1] + '</b>' +
@@ -206,6 +233,7 @@
       row('Best for', t => escape(pitch(t) || 'Not specified')) +
       row('Setup type', t => escape(({'no-code':'✓ No-code','low-code':'◐ Low-code',developer:'Developer setup'})[t.setup_complexity] || 'Not confirmed')) +
       row('Why this tool fits', fitDetail, 'compare-reason-row') +
+      row('Trust & sources', trustEvidence, 'compare-trust-row') +
       row('Your choice', select, 'compare-action-row') +
       '</tbody></table></div>' + pages + '</div>';
   }
